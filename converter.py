@@ -4,7 +4,6 @@ Pydantic to Neo4j OGM Converter.
 This module provides a utility for converting between Pydantic models and Neo4j OGM models
 with support for relationships, nested models, and custom type conversions.
 """
-import inspect
 import logging
 from datetime import datetime, date
 from functools import lru_cache
@@ -113,35 +112,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             bool: True if the attribute is a neomodel relationship, False otherwise.
         """
         return isinstance(attr, (RelationshipTo, RelationshipFrom, Relationship))
-
-    @classmethod
-    def _get_ogm_relationships(
-            cls, ogm_class: Type[StructuredNode]
-    ) -> Dict[str, Union[RelationshipTo, RelationshipFrom, Relationship]]:
-        """
-        Retrieve all relationship fields of a neomodel StructuredNode class.
-
-        Args:
-            ogm_class (Type[StructuredNode]): A neomodel StructuredNode class.
-
-        Returns:
-            Dict[str, Union[RelationshipTo, RelationshipFrom, Relationship]]:
-                A dictionary mapping relationship names to their corresponding relationship instances.
-        """
-        # Use __all_relationships__ attribute which is available in StructuredNode classes
-        if hasattr(ogm_class, '__all_relationships__'):
-            return dict(ogm_class.__all_relationships__)
-
-        # As a fallback, use defined_properties method if available
-        if hasattr(ogm_class, 'defined_properties'):
-            return ogm_class.defined_properties(aliases=False, rels=True, properties=False)
-
-        # Manual inspection as last resort
-        return {
-            name: attr
-            for name, attr in inspect.getmembers(ogm_class)
-            if not name.startswith('_') and cls._is_relationship(attr)
-        }
 
     @classmethod
     def _get_property_type(cls, prop: Any) -> Any:  # Return Any instead of Type to fix error
@@ -367,7 +337,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
         # Process relationships if we have depth remaining.
         sentinel = object()
-        ogm_relationships = cls._get_ogm_relationships(ogm_class)
+        ogm_relationships = ogm_class.defined_properties(aliases=False, rels=True, properties=False)
         for rel_name, rel in ogm_relationships.items():
             # Skip inverse relationships since they are automatically managed.
             # if isinstance(rel, RelationshipFrom):
@@ -737,7 +707,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         ogm_instance.save()
 
         # Process relationships
-        ogm_relationships = cls._get_ogm_relationships(ogm_class)
+        ogm_relationships = ogm_class.defined_properties(aliases=False, rels=True, properties=False)
         cls._dict_to_ogm_process_relationships(
             ogm_instance, data_dict, ogm_relationships, processed_objects, max_depth
         )
@@ -826,7 +796,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
         try:
             # Process relationships
-            ogm_relationships = cls._get_ogm_relationships(type(ogm_instance))
+            ogm_relationships = type(ogm_instance).defined_properties(aliases=False, rels=True, properties=False)
 
             # Process relationships with unified approach
             for rel_name, rel in ogm_relationships.items():
@@ -965,7 +935,8 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
         # Process relationships if requested and depth limit not reached
         if include_relationships and max_depth > 0:
-            for rel_name, rel in cls._get_ogm_relationships(type(ogm_instance)).items():
+            for rel_name, rel in type(ogm_instance).defined_properties(aliases=False, rels=True,
+                                                                       properties=False).items():
                 # Determine if relationship is one-to-one or one-to-many
                 is_single = hasattr(rel, 'manager') and rel.manager.__name__ in (
                     'ZeroOrOne', 'One', 'AsyncZeroOrOne', 'AsyncOne'
