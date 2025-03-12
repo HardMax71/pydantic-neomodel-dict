@@ -1,0 +1,42 @@
+services:
+  neo4j:
+    image: neo4j:5.16.0
+    container_name: neo4j-pydantic-converter
+    ports:
+      # HTTP
+      - "7474:7474"
+      # Bolt
+      - "7687:7687"
+      # HTTPS
+      - "7473:7473"
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
+      - NEO4J_apoc_export_file_enabled=true
+      - NEO4J_apoc_import_file_enabled=true
+      - NEO4J_apoc_import_file_use__neo4j__config=true
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*,algo.*,gds.*
+      # Enable APOC for the inspect_database functionality
+      - NEO4J_dbms_security_procedures_allowlist=apoc.*,algo.*,gds.*
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/import
+      - neo4j_conf:/var/lib/neo4j/conf
+    networks:
+      - neo4j-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  neo4j_import:
+  neo4j_conf:
+
+networks:
+  neo4j-network:
+    driver: bridge
