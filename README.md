@@ -1,4 +1,4 @@
-# Pydantic ↔ Neo4j OGM ↔ Python Dict Converter
+# Pydantic ↔ Neomodel OGM ↔ Python Dict Converter
 
 ![Tests](https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml/badge.svg)
 [![Ruff](https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml/badge.svg?branch=main&event=push&label=ruff)](https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml)
