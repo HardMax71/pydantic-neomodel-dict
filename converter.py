@@ -4,17 +4,17 @@ Pydantic to Neo4j OGM Converter.
 This module provides a utility for converting between Pydantic models and Neo4j OGM models
 with support for relationships, nested models, and custom type conversions.
 """
-from neomodel import ZeroOrOne, One, AsyncZeroOrOne, AsyncOne
 import inspect
 import logging
 from datetime import datetime, date
 from functools import lru_cache
-from typing import Type, TypeVar, Dict, List, Any, Optional, Union, Tuple, get_type_hints, Callable, Set
+from typing import Type, Dict, List, Any, Optional, Union, Tuple, get_type_hints, Callable, Set, Generic, TypeVar
 
 from neomodel import (
     StructuredNode, RelationshipTo, RelationshipFrom,
     Relationship, db
 )
+from neomodel import ZeroOrOne, One, AsyncZeroOrOne, AsyncOne
 from neomodel.properties import (
     StringProperty, IntegerProperty, FloatProperty, BooleanProperty,
     DateTimeProperty, ArrayProperty, JSONProperty
@@ -34,7 +34,7 @@ class ConversionError(Exception):
     pass
 
 
-class Converter:
+class Converter(Generic[PydanticModel, OGM_Model]):
     """
     A utility class for converting between Pydantic models and neomodel OGM models.
 
@@ -47,52 +47,6 @@ class Converter:
     - Conversion from Python dictionaries to OGM models (via dict_to_ogm)
       and from OGM models to Python dictionaries (via ogm_to_dict).
     - Batch conversion of multiple models (via batch_to_ogm and batch_to_pydantic).
-
-    Usage Example:
-    --------------
-        from pydantic import BaseModel
-        from neomodel import StructuredNode, StringProperty, IntegerProperty, config, db
-        from converter import Converter
-
-        # Set up the Neo4j connection (must be done before using neomodel models)
-        config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
-
-        # Define a Pydantic model
-        class UserPydantic(BaseModel):
-            name: str
-            email: str
-            age: int
-
-        # Define a corresponding neomodel OGM model
-        class UserOGM(StructuredNode):
-            name = StringProperty(required=True)
-            email = StringProperty(unique_index=True, required=True)
-            age = IntegerProperty(default=0)
-
-        # Register the mapping between the Pydantic model and the OGM model.
-        # This ensures that the Converter knows how to translate between the two.
-        Converter.register_models(UserPydantic, UserOGM)
-
-        # Create an instance of the Pydantic model.
-        user_py = UserPydantic(name="Alice", email="alice@example.com", age=30)
-
-        # Convert the Pydantic model to an OGM model.
-        user_ogm = Converter.to_ogm(user_py)
-        print("Converted to OGM:", user_ogm.name, user_ogm.email, user_ogm.age)
-
-        # Convert the OGM model back to a Pydantic model.
-        # By default, this conversion uses the registered mapping.
-        user_py_converted = Converter.to_pydantic(user_ogm)
-        print("Converted back to Pydantic:", user_py_converted.name, user_py_converted.email, user_py_converted.age)
-
-        # The converter also supports converting from dictionaries:
-        data_dict = {"name": "Bob", "email": "bob@example.com", "age": 25}
-        user_ogm_from_dict = Converter.dict_to_ogm(data_dict, UserOGM)
-        print("Converted from dict to OGM:", user_ogm_from_dict.name, user_ogm_from_dict.email, user_ogm_from_dict.age)
-
-        # And converting OGM models to dictionaries:
-        user_dict = Converter.ogm_to_dict(user_ogm_from_dict)
-        print("OGM converted to dict:", user_dict)
     """
 
     # Registry to store mappings between Pydantic and OGM models
@@ -216,7 +170,7 @@ class Converter:
         }
 
     @classmethod
-    def _get_property_type(cls, prop: Any) -> Type:
+    def _get_property_type(cls, prop: Any) -> Any:  # Return Any instead of Type to fix error
         """
         Determine the Python type corresponding to a neomodel property.
 
@@ -335,7 +289,8 @@ class Converter:
         logger.debug(f"Registered mapping: {pydantic_class.__name__} <-> {ogm_class.__name__}")
 
     @classmethod
-    def _process_pydantic_field(cls, pydantic_instance, field_name, pydantic_data):
+    def _process_pydantic_field(cls, pydantic_instance: BaseModel, field_name: str,
+                                pydantic_data: Dict[str, Any]) -> None:
         """
         Process a single field from a Pydantic model, handling BaseModel instances and lists of BaseModels.
 
@@ -395,7 +350,7 @@ class Converter:
     @classmethod
     def to_ogm(
             cls,
-            pydantic_instance: PydanticModel,
+            pydantic_instance: BaseModel,  # Change from PydanticModel to BaseModel
             ogm_class: Optional[Type[OGM_Model]] = None,
             processed_objects: Optional[Dict[int, OGM_Model]] = None,
             max_depth: int = 10
@@ -404,15 +359,15 @@ class Converter:
         Convert a Pydantic model instance to a neomodel OGM model instance.
 
         Args:
-            pydantic_instance (PydanticModel): The Pydantic model instance to convert.
+            pydantic_instance (BaseModel): The Pydantic model instance to convert.
             ogm_class (Optional[Type[OGM_Model]]): The target neomodel OGM model class. If not provided,
                 the registered mapping is used.
-            processed_objects (Optional[Dict[int, O]]): A dictionary to track already processed objects
+            processed_objects (Optional[Dict[int, OGM_Model]]): A dictionary to track already processed objects
                 for handling cyclic references.
             max_depth (int): The maximum recursion depth for processing nested relationships.
 
         Returns:
-            O: The converted neomodel OGM model instance.
+            Optional[OGM_Model]: The converted neomodel OGM model instance.
         """
         if pydantic_instance is None:
             return None
@@ -440,7 +395,7 @@ class Converter:
         processed_objects[instance_id] = ogm_instance
 
         # Extract Pydantic data.
-        pydantic_data = {}
+        pydantic_data: Dict[str, Any] = {}
         try:
             pydantic_data = pydantic_instance.model_dump(exclude_unset=True, exclude_none=True)
         except ValueError as e:
@@ -470,7 +425,6 @@ class Converter:
             # Skip inverse relationships since they are automatically managed.
             # if isinstance(rel, RelationshipFrom):
             #    continue
-
 
             rel_data = getattr(pydantic_instance, rel_name, sentinel)
             if rel_data is sentinel:
@@ -506,8 +460,16 @@ class Converter:
         return ogm_instance
 
     @classmethod
-    def _process_related_item(cls, item, ogm_instance, rel_name, target_ogm_class,
-                              processed_objects, max_depth, instance_id):
+    def _process_related_item(
+            cls,
+            item: Union[BaseModel, Dict[str, Any]],
+            ogm_instance: OGM_Model,
+            rel_name: str,
+            target_ogm_class: Type[StructuredNode],
+            processed_objects: Dict[int, OGM_Model],
+            max_depth: int,
+            instance_id: int
+    ) -> bool:
         """
         Process a single related item and connect it to the OGM instance if successful.
 
@@ -551,7 +513,7 @@ class Converter:
                     related_pydantic,
                     target_ogm_class,
                     processed_objects,
-                    max_depth  # Use the caller’s decremented depth.
+                    max_depth  # Use the caller's decremented depth.
                 )
                 if related_instance:
                     if isinstance(rel_manager, (ZeroOrOne, One, AsyncZeroOrOne, AsyncOne)):
@@ -570,8 +532,8 @@ class Converter:
     def _create_minimal_pydantic_instance(
             cls,
             ogm_instance: OGM_Model,
-            pydantic_class: Optional[Type[PydanticModel]] = None
-    ) -> PydanticModel:
+            pydantic_class: Optional[Type[BaseModel]] = None
+    ) -> BaseModel:
         """
         Create a minimal Pydantic instance with only essential properties.
         Used for cycle breaking and max depth handling.
@@ -586,7 +548,7 @@ class Converter:
         # Extract essential properties
         sentinel = object()
         ogm_properties = cls._get_ogm_properties(type(ogm_instance))
-        pydantic_data = {}
+        pydantic_data: Dict[str, Any] = {}
 
         for prop_name, prop in ogm_properties.items():
             # Prioritize required and unique index properties
@@ -652,36 +614,38 @@ class Converter:
     def batch_to_pydantic(
             cls,
             ogm_instances: List[OGM_Model],
-            pydantic_class: Optional[Type[PydanticModel]] = None,
+            pydantic_class: Optional[Type[BaseModel]] = None,
             max_depth: int = 10
-    ) -> List[PydanticModel]:
+    ) -> List[BaseModel]:
         """
         Convert a list of neomodel OGM model instances to Pydantic model instances.
 
         Args:
             ogm_instances (List[OGM_Model]): A list of neomodel OGM model instances to convert.
-            pydantic_class (Optional[Type[PydanticModel]]): The target Pydantic model class.
+            pydantic_class (Optional[Type[BaseModel]]): The target Pydantic model class.
                 If not provided, the registered mapping is used.
             max_depth (int): The maximum recursion depth for processing nested relationships.
 
         Returns:
-            List[PydanticModel]: A list of converted Pydantic model instances.
+            List[BaseModel]: A list of converted Pydantic model instances.
         """
         if not ogm_instances:
             return []
 
         # Use a single processed_objects dictionary for the entire batch
-        processed_objects = {}
+        processed_objects: Dict[int, BaseModel] = {}
 
-        return [
-            cls.to_pydantic(instance, pydantic_class, processed_objects, max_depth, set())
-            for instance in ogm_instances
-        ]
+        result = []
+        for instance in ogm_instances:
+            pydantic_instance = cls.to_pydantic(instance, pydantic_class, processed_objects, max_depth, set())
+            if pydantic_instance is not None:
+                result.append(pydantic_instance)
+        return result
 
     @classmethod
     def batch_to_ogm(
             cls,
-            pydantic_instances: List[PydanticModel],
+            pydantic_instances: List[BaseModel],
             ogm_class: Optional[Type[OGM_Model]] = None,
             max_depth: int = 10
     ) -> List[OGM_Model]:
@@ -692,7 +656,7 @@ class Converter:
         for improved performance.
 
         Args:
-            pydantic_instances (List[PydanticModel]): A list of Pydantic model instances to convert.
+            pydantic_instances (List[BaseModel]): A list of Pydantic model instances to convert.
             ogm_class (Optional[Type[OGM_Model]]): The target neomodel OGM model class.
                 If not provided, the registered mapping is used.
             max_depth (int): The maximum recursion depth for processing nested relationships.
@@ -707,14 +671,16 @@ class Converter:
             return []
 
         # Use a single processed_objects dictionary for the entire batch
-        processed_objects = {}
+        processed_objects: Dict[int, OGM_Model] = {}
 
         # Use a transaction for the entire batch
+        result: List[OGM_Model] = []
         with db.transaction:
-            return [
-                cls.to_ogm(instance, ogm_class, processed_objects, max_depth)
-                for instance in pydantic_instances
-            ]
+            for instance in pydantic_instances:
+                ogm_instance = cls.to_ogm(instance, ogm_class, processed_objects, max_depth)
+                if ogm_instance is not None:
+                    result.append(ogm_instance)
+        return result
 
     @classmethod
     def _dict_to_ogm_process_relationships(
@@ -767,7 +733,7 @@ class Converter:
                         cls._connect_related_instance(rel_manager, related_instance)
 
     @classmethod
-    def _connect_related_instance(cls, rel_manager, related_instance):
+    def _connect_related_instance(cls, rel_manager: Any, related_instance: OGM_Model) -> None:
         """Helper method to connect a related instance to a relationship manager"""
         if isinstance(rel_manager, (ZeroOrOne, One, AsyncZeroOrOne, AsyncOne)):
             try:
@@ -844,11 +810,11 @@ class Converter:
     def to_pydantic(
             cls,
             ogm_instance: OGM_Model,
-            pydantic_class: Optional[Type[PydanticModel]] = None,
-            processed_objects: Optional[Dict[int, PydanticModel]] = None,
+            pydantic_class: Optional[Type[BaseModel]] = None,
+            processed_objects: Optional[Dict[int, BaseModel]] = None,
             max_depth: int = 10,
             current_path: Optional[Set[int]] = None
-    ) -> Optional[PydanticModel]:
+    ) -> Optional[BaseModel]:
         """
         Convert a neomodel OGM model instance to a Pydantic model instance.
 
@@ -870,8 +836,9 @@ class Converter:
             logger.info(f"Maximum recursion depth reached for {type(ogm_instance).__name__}")
             return None
 
-        # Initialize tracking structures
-        processed_objects = processed_objects or {}
+        # Initialize tracking structures if any is None
+        if processed_objects is None:
+            processed_objects = {}
         current_path = current_path or set()
 
         # Get instance ID for memory-based cycle detection
@@ -883,6 +850,12 @@ class Converter:
 
         # Handle cycle detection - create minimal instance with just key properties
         if instance_id in current_path:
+            if pydantic_class is None:
+                ogm_class = type(ogm_instance)
+                if ogm_class not in cls._ogm_to_pydantic:
+                    raise ConversionError(f"No mapping registered for OGM class {ogm_class.__name__}")
+                pydantic_class = cls._ogm_to_pydantic[ogm_class]
+
             stub_instance = cls._create_minimal_pydantic_instance(ogm_instance, pydantic_class)
             processed_objects[instance_id] = stub_instance
             return stub_instance
@@ -927,7 +900,7 @@ class Converter:
                     logger.warning(f"Could not resolve target class for relationship {rel_name}")
                     continue
 
-                target_pydantic_class: Optional[PydanticModel] = cls._ogm_to_pydantic.get(target_ogm_class)
+                target_pydantic_class = cls._ogm_to_pydantic.get(target_ogm_class)
                 if not target_pydantic_class:
                     logger.warning(f"No Pydantic model registered for OGM class {target_ogm_class.__name__}")
                     continue
@@ -939,8 +912,11 @@ class Converter:
 
                 # If we can't determine from field type, fall back to OGM cardinality check
                 if field_type is Any:
-                    cardinality_name = getattr(rel, 'manager', None).__name__ if hasattr(rel, 'manager') else \
-                        rel.definition.get('cardinality', {}).__name__ if 'cardinality' in rel.definition else None
+                    cardinality_name = None
+                    if hasattr(rel, 'manager'):
+                        cardinality_name = rel.manager.__name__
+                    elif 'cardinality' in rel.definition and hasattr(rel.definition['cardinality'], '__name__'):
+                        cardinality_name = rel.definition['cardinality'].__name__
 
                     is_single = cardinality_name in (
                         'ZeroOrOne', 'One', 'AsyncZeroOrOne', 'AsyncOne') if cardinality_name else False
@@ -1094,13 +1070,16 @@ class Converter:
         """
         Batch convert a list of dictionaries to OGM model instances.
         """
-        processed_objects = {}
-        from neomodel.sync_.core import db
+        processed_objects: Dict[int, OGM_Model] = {}
+        result: List[OGM_Model] = []
+
         with db.transaction:
-            return [
-                cls.dict_to_ogm(d, ogm_class, processed_objects, max_depth)
-                for d in data_dicts
-            ]
+            for d in data_dicts:
+                ogm_instance = cls.dict_to_ogm(d, ogm_class, processed_objects, max_depth)
+                if ogm_instance is not None:
+                    result.append(ogm_instance)
+
+        return result
 
     @classmethod
     def batch_ogm_to_dict(
@@ -1113,9 +1092,11 @@ class Converter:
         """
         Batch convert a list of OGM model instances to dictionaries.
         """
-        processed_objects = {}
-        return [
-            cls.ogm_to_dict(
+        processed_objects: Dict[int, dict] = {}
+        result: List[dict] = []
+
+        for instance in ogm_instances:
+            dict_result = cls.ogm_to_dict(
                 instance,
                 processed_objects,
                 max_depth,
@@ -1123,5 +1104,7 @@ class Converter:
                 include_properties,
                 include_relationships
             )
-            for instance in ogm_instances
-        ]
+            if dict_result is not None:
+                result.append(dict_result)
+
+        return result
