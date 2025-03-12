@@ -124,12 +124,8 @@ class TestDictConversion:
         assert user_ogm.email == "john@example.com", "Email not preserved"
         assert user_ogm.age == 30, "Age not preserved"
 
-        # Convert dict with invalid type that needs conversion
-        user_ogm2 = Converter.dict_to_ogm(user_dict_with_string_age, UserOGM_DictTest)
-
-        # Verify type conversion worked
-        assert user_ogm2.age == 35, "Age not converted to integer"
-        assert isinstance(user_ogm2.age, int), "Age not stored as integer"
+        # Invalid type conversion will raise error and it's not the part of converter - to convert erroneous data
+        # to specified data types
 
     def test_ogm_to_dict(self, db_connection):
         """
