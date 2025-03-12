@@ -98,21 +98,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             return isinstance(attr, property_types)
         except TypeError:
             return False
-
-    @classmethod
-    @lru_cache(maxsize=128)
-    def _is_relationship(cls, attr: Any) -> bool:
-        """
-        Determine if the given attribute is a neomodel relationship.
-
-        Args:
-            attr (Any): The attribute to check.
-
-        Returns:
-            bool: True if the attribute is a neomodel relationship, False otherwise.
-        """
-        return isinstance(attr, (RelationshipTo, RelationshipFrom, Relationship))
-
     @classmethod
     def _get_property_type(cls, prop: Any) -> Any:  # Return Any instead of Type to fix error
         """
