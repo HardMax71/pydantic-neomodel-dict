@@ -115,32 +115,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         return isinstance(attr, (RelationshipTo, RelationshipFrom, Relationship))
 
     @classmethod
-    def _get_ogm_properties(cls, ogm_class: Type[StructuredNode]) -> Dict[str, Any]:
-        """
-        Retrieve all property fields of a neomodel StructuredNode class.
-
-        Args:
-            ogm_class (Type[StructuredNode]): A neomodel StructuredNode class.
-
-        Returns:
-            Dict[str, Any]: A dictionary mapping property names to their corresponding property instances.
-        """
-        # Use __all_properties__ attribute which is available in StructuredNode classes
-        if hasattr(ogm_class, '__all_properties__'):
-            return dict(ogm_class.__all_properties__)
-
-        # As a fallback, use defined_properties method if available
-        if hasattr(ogm_class, 'defined_properties'):
-            return ogm_class.defined_properties(aliases=False, rels=False)
-
-        # Manual inspection as last resort
-        return {
-            name: attr
-            for name, attr in inspect.getmembers(ogm_class)
-            if not name.startswith('_') and cls._is_property(attr)
-        }
-
-    @classmethod
     def _get_ogm_relationships(
             cls, ogm_class: Type[StructuredNode]
     ) -> Dict[str, Union[RelationshipTo, RelationshipFrom, Relationship]]:
@@ -321,33 +295,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         pydantic_data[field_name] = value
 
     @classmethod
-    def _resolve_node_class(cls, class_name_or_obj: Union[str, Type[StructuredNode]]) -> Optional[Type[StructuredNode]]:
-        """
-        Resolve a class name or object to an actual class using a direct lookup in the registered mappings.
-
-        Args:
-            class_name_or_obj: Either a string class name or a class object.
-
-        Returns:
-            The resolved class or None if not found.
-        """
-        # If already a class, just return it.
-        if not isinstance(class_name_or_obj, str):
-            return class_name_or_obj
-
-        # Build a simple mapping from class name to the OGM class based on our registered models.
-        mapping = {ogm_cls.__name__: ogm_cls for ogm_cls in cls._ogm_to_pydantic.keys()}
-        if class_name_or_obj in mapping:
-            return mapping[class_name_or_obj]
-
-        # Fall back to searching in Neo4j's registry.
-        for label_set, cls_obj in db._NODE_CLASS_REGISTRY.items():
-            if cls_obj.__name__ == class_name_or_obj:
-                return cls_obj
-
-        return None
-
-    @classmethod
     def to_ogm(
             cls,
             pydantic_instance: BaseModel,  # Change from PydanticModel to BaseModel
@@ -405,7 +352,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             else:
                 raise ConversionError(f"Failed to get dictionary from Pydantic model: {str(e)}")
 
-        ogm_properties = cls._get_ogm_properties(ogm_class)
+        ogm_properties = ogm_class.defined_properties(rels=False, aliases=False)
         for prop_name, prop in ogm_properties.items():
             if prop_name in pydantic_data:
                 value = pydantic_data[prop_name]
@@ -433,11 +380,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             if rel_data is None:
                 continue
 
-            # Resolve target class.
-            target_ogm_class = cls._resolve_node_class(rel.definition['node_class'])
-            if not target_ogm_class:
-                logger.warning(f"Could not resolve target class for relationship {rel_name}")
-                continue
+            target_ogm_class = rel.definition['node_class']
 
             # Normalize to list if needed.
             if not isinstance(rel_data, list):
@@ -547,7 +490,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
         # Extract essential properties
         sentinel = object()
-        ogm_properties = cls._get_ogm_properties(type(ogm_instance))
+        ogm_properties = type(ogm_instance).defined_properties(rels=False, aliases=False)
         pydantic_data: Dict[str, Any] = {}
 
         for prop_name, prop in ogm_properties.items():
@@ -570,7 +513,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
     ) -> dict:
         """Extract property data from OGM instance for Pydantic model creation."""
         sentinel = object()
-        ogm_properties = cls._get_ogm_properties(type(ogm_instance))
+        ogm_properties = type(ogm_instance).defined_properties(rels=False, aliases=False)
 
         return {
             prop_name: cls._convert_value(value, pydantic_fields.get(prop_name, Any))
@@ -709,10 +652,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                 continue
 
             rel_data = data_dict[rel_name]
-            target_ogm_class = cls._resolve_node_class(rel.definition['node_class'])
-            if not target_ogm_class:
-                raise ConversionError(f"Could not resolve target class for relationship {rel_name}")
-
+            target_ogm_class = rel.definition['node_class']
             rel_manager = getattr(ogm_instance, rel_name)
 
             # Normalize to list if needed
@@ -787,7 +727,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         processed_objects[instance_id] = ogm_instance
 
         # Process properties
-        for prop_name, prop in cls._get_ogm_properties(ogm_class).items():
+        for prop_name, prop in ogm_class.defined_properties(rels=False, aliases=False).items():
             if prop_name in data_dict:
                 value = data_dict[prop_name]
                 prop_type = cls._get_property_type(prop)
@@ -895,11 +835,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                     continue
 
                 # Get target class information
-                target_ogm_class = cls._resolve_node_class(rel.definition.get('node_class'))
-                if not target_ogm_class:
-                    logger.warning(f"Could not resolve target class for relationship {rel_name}")
-                    continue
-
+                target_ogm_class = rel.definition['node_class']
                 target_pydantic_class = cls._ogm_to_pydantic.get(target_ogm_class)
                 if not target_pydantic_class:
                     logger.warning(f"No Pydantic model registered for OGM class {target_ogm_class.__name__}")
@@ -970,7 +906,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         sentinel = object()
         return {
             prop_name: value
-            for prop_name, prop in cls._get_ogm_properties(type(ogm_instance)).items()
+            for prop_name, prop in type(ogm_instance).defined_properties(rels=False, aliases=False).items()
             if (value := getattr(ogm_instance, prop_name, sentinel)) is not sentinel
         }
 
@@ -1030,10 +966,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         # Process relationships if requested and depth limit not reached
         if include_relationships and max_depth > 0:
             for rel_name, rel in cls._get_ogm_relationships(type(ogm_instance)).items():
-                target_cls = cls._resolve_node_class(rel.definition.get('node_class'))
-                if target_cls is None:
-                    continue
-
                 # Determine if relationship is one-to-one or one-to-many
                 is_single = hasattr(rel, 'manager') and rel.manager.__name__ in (
                     'ZeroOrOne', 'One', 'AsyncZeroOrOne', 'AsyncOne'
