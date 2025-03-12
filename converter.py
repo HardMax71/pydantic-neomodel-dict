@@ -10,8 +10,7 @@ from functools import lru_cache
 from typing import Type, Dict, List, Any, Optional, Union, Tuple, get_type_hints, Callable, Set, Generic, TypeVar
 
 from neomodel import (
-    StructuredNode, RelationshipTo, RelationshipFrom,
-    Relationship, db
+    StructuredNode, db
 )
 from neomodel import ZeroOrOne, One, AsyncZeroOrOne, AsyncOne
 from neomodel.properties import (
@@ -77,28 +76,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         logger.debug(f"Registered type converter: {source_type.__name__} -> {target_type.__name__}")
 
     @classmethod
-    @lru_cache(maxsize=128)
-    def _is_property(cls, attr: Any) -> bool:
-        """
-        Determine if the given attribute is a neomodel property.
-
-        This function checks whether the attribute is an instance of any known neomodel property type.
-
-        Args:
-            attr (Any): The attribute to check.
-
-        Returns:
-            bool: True if the attribute is a neomodel property, False otherwise.
-        """
-        try:
-            property_types = (
-                StringProperty, IntegerProperty, FloatProperty, BooleanProperty,
-                DateTimeProperty, ArrayProperty, JSONProperty
-            )
-            return isinstance(attr, property_types)
-        except TypeError:
-            return False
-    @classmethod
     def _get_property_type(cls, prop: Any) -> Any:  # Return Any instead of Type to fix error
         """
         Determine the Python type corresponding to a neomodel property.
@@ -128,7 +105,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         # For any other property types, try to get the type from the property_type attribute
         # or use Any as a fallback
         try:
-            return getattr(prop, 'property_type', Any)
+            return getattr(prop, 'property_type')
         except (AttributeError, TypeError):
             return Any
 
@@ -150,56 +127,10 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         source_type = type(value)
 
         # Check for direct registered converter
+        # Useful for objects/nested structures with objects
         converter = cls._type_converters.get((source_type, target_type))
         if converter:
             return converter(value)
-
-        # Handle basic type conversions
-        if target_type is str and not isinstance(value, str):
-            return str(value)
-
-        if target_type is int and isinstance(value, (str, float)):
-            return int(value)
-
-        if target_type is float and isinstance(value, (str, int)):
-            return float(value)
-
-        if target_type is bool and not isinstance(value, bool):
-            return bool(value)
-
-        if target_type is datetime and isinstance(value, str):
-            try:
-                # Try ISO format first
-                return datetime.fromisoformat(value)
-            except ValueError:
-                # Try other common formats
-                for fmt in ["%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"]:
-                    try:
-                        return datetime.strptime(value, fmt)
-                    except ValueError:
-                        continue
-
-                # If all else fails, raise an error
-                raise ConversionError(f"Cannot convert string '{value}' to datetime")
-
-        if target_type is date and isinstance(value, str):
-            try:
-                # Try ISO format first
-                return date.fromisoformat(value)
-            except ValueError:
-                # Try other common formats
-                for fmt in ["%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"]:
-                    try:
-                        return datetime.strptime(value, fmt).date()
-                    except ValueError:
-                        continue
-
-                # If all else fails, raise an error
-                raise ConversionError(f"Cannot convert string '{value}' to date")
-
-        # If the target_type is a class and the value is a dict, attempt to create an instance
-        if isinstance(target_type, type) and issubclass(target_type, BaseModel) and isinstance(value, dict):
-            return target_type(**value)
 
         # If we get here, just return the original value
         return value
