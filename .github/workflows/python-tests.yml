@@ -71,8 +71,9 @@ jobs:
       - name: Generate coverage report for unit tests
         run: pytest --cov=converter --cov-report=xml unit_tests/
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage.xml
           fail_ci_if_error: false
 
@@ -108,7 +109,8 @@ jobs:
       - name: Generate coverage report for hypothesis tests
         run: pytest --cov=converter --cov-report=xml tests_hypothesis/
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage.xml
           fail_ci_if_error: false
