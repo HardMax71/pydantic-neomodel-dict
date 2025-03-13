@@ -630,8 +630,8 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         # Get instance ID for memory-based cycle detection
         instance_id = ogm_instance.element_id
 
-        # Return already processed instance if we've seen it before
-        if instance_id in processed_objects:
+        # Return already processed instance if we've seen it before (not in a cycle)
+        if instance_id in processed_objects and instance_id not in current_path:
             return processed_objects[instance_id]
 
         # Handle cycle detection - create minimal instance with just key properties
@@ -642,8 +642,9 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                     raise ConversionError(f"No mapping registered for OGM class {ogm_class.__name__}")
                 pydantic_class = cls._ogm_to_pydantic[ogm_class]
 
+            # Create a new stub instance for this cycle instance
+            # Important: we DO NOT store this in processed_objects to keep them distinct
             stub_instance = cls._create_minimal_pydantic_instance(ogm_instance, pydantic_class)
-            processed_objects[instance_id] = stub_instance
             return stub_instance
 
         # Resolve Pydantic class if not provided
@@ -717,12 +718,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                 converted_objects = []
 
                 for obj in objects_to_process:
-                    # Skip conversion if already processed
-                    obj_id = obj.element_id
-                    if obj_id in processed_objects:
-                        converted_objects.append(processed_objects[obj_id])
-                        continue
-
                     # Process the related object
                     conv = cls.to_pydantic(
                         obj,
