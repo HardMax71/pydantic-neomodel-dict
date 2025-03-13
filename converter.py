@@ -380,9 +380,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Returns:
             List[BaseModel]: A list of converted Pydantic model instances.
         """
-        if not ogm_instances:
-            return []
-
         # Use a single processed_objects dictionary for the entire batch
         processed_objects: Dict[int, BaseModel] = {}
 
@@ -524,9 +521,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Returns:
             A new or updated OGM model instance, or None if input is None
         """
-        if data_dict is None:
-            return None
-
         if max_depth <= 0:
             logger.warning("Maximum recursion depth reached during dict_to_ogm conversion")
             return None
@@ -656,45 +650,23 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
                 # Determine relationship cardinality
                 field_type = pydantic_fields.get(rel_name)
-                is_list = any([get_origin(field_type) is list, field_type is list])
-                is_single = not is_list
-
-                # If we can't determine from field type, fall back to OGM cardinality check
-                if field_type is Any:
-                    cardinality_name = None
-                    if hasattr(rel, 'manager'):
-                        cardinality_name = rel.manager.__name__
-                    elif 'cardinality' in rel.definition and hasattr(rel.definition['cardinality'], '__name__'):
-                        cardinality_name = rel.definition['cardinality'].__name__
-
-                    is_single = cardinality_name in (
-                        'ZeroOrOne', 'One', 'AsyncZeroOrOne', 'AsyncOne') if cardinality_name else False
+                is_single = not any([get_origin(field_type) is list, field_type is list])
 
                 # Get related objects
-                try:
-                    rel_mgr = getattr(ogm_instance, rel_name)
-                    rel_objects = list(rel_mgr.all())
-                except Exception as e:
-                    logger.warning(f"Error retrieving relationship {rel_name}: {e}")
-                    rel_objects = []
+                rel_mgr = getattr(ogm_instance, rel_name)
+                rel_objects = list(rel_mgr.all())
 
                 # Convert related objects
-                objects_to_process: List[StructuredNode] = [
-                    rel_objects[0]] if is_single and rel_objects else rel_objects
-                converted_objects = []
-
-                for obj in objects_to_process:
-                    # Process the related object
-                    conv = cls.to_pydantic(
+                converted_objects = [
+                    cls.to_pydantic(
                         obj,
                         target_pydantic_class,
                         processed_objects,
                         max_depth - 1,
                         current_path
                     )
-
-                    if conv is not None:
-                        converted_objects.append(conv)
+                    for obj in rel_objects
+                ]
 
                 # Set attribute based on cardinality
                 if is_single:
