@@ -204,11 +204,11 @@ class TestCycleDetection:
         """
 
         # Define the class outside the method to avoid lookup issues
-        class UnregisteredOGM(StructuredNode):
+        class UnregisteredCyclicORM(StructuredNode):
             name = StringProperty()
 
         # Create an instance without self-reference
-        unregistered = UnregisteredOGM(name="Unregistered").save()
+        unregistered = UnregisteredCyclicORM(name="Unregistered").save()
 
         # Clear registrations to force error
         Converter._ogm_to_pydantic = {}
@@ -219,7 +219,7 @@ class TestCycleDetection:
 
         # Verify error message
         assert "No mapping registered for OGM class" in str(excinfo.value)
-        assert "UnregisteredOGM" in str(excinfo.value)
+        assert "UnregisteredCyclicORM" in str(excinfo.value)
 
     def test_minimal_instance_creates_minimal_properties(self, db_connection):
         """
