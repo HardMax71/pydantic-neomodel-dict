@@ -105,7 +105,7 @@ jobs:
           pip install pytest pytest-cov hypothesis neomodel pydantic
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Run hypothesis tests
-        run: pytest -xvs tests_hypothesis/all_tests.py
+        run: pytest -xvs tests_hypothesis/
       - name: Generate coverage report for hypothesis tests
         run: pytest --cov=converter --cov-report=xml tests_hypothesis/
       - name: Upload coverage to Codecov
