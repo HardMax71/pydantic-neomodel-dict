@@ -418,9 +418,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Raises:
             ConversionError: If the conversion fails.
         """
-        if not pydantic_instances:
-            return []
-
         # Use a single processed_objects dictionary for the entire batch
         processed_objects: Dict[int, OGM_Model] = {}
 
@@ -454,6 +451,9 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             ogm_relationships: Dictionary of OGM relationship definitions
             processed_objects: Dictionary tracking already processed objects
             max_depth: Maximum recursion depth for nested relationships
+
+        Raises:
+            ConversionError: If relationship data is not properly formatted
         """
         for rel_name, rel in ogm_relationships.items():
             if rel_name not in data_dict or data_dict[rel_name] is None:
@@ -463,22 +463,30 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             target_ogm_class = rel.definition['node_class']
             rel_manager = getattr(ogm_instance, rel_name)
 
+            # Validate relationship data type - must be dict or list
+            if not isinstance(rel_data, (dict, list)):
+                raise ConversionError(
+                    f"Relationship '{rel_name}' must be a dictionary or list of dictionaries, "
+                    f"got {type(rel_data).__name__}"
+                )
+
             # Normalize to list if needed
             if not isinstance(rel_data, list):
                 rel_data = [rel_data]
 
+            # Validate all items in the list are dictionaries
+            for i, item in enumerate(rel_data):
+                if not isinstance(item, dict):
+                    raise ConversionError(
+                        f"Relationship '{rel_name}' list item {i} must be a dictionary, "
+                        f"got {type(item).__name__}"
+                    )
+
             new_max_depth = max_depth - 1
             for item in rel_data:
-                if isinstance(item, BaseModel):
-                    # Handle Pydantic models directly
-                    related_instance = cls.to_ogm(item, target_ogm_class, processed_objects, new_max_depth)
-                    if related_instance:
-                        cls._connect_related_instance(rel_manager, related_instance)
-                elif isinstance(item, dict):
-                    # Handle dictionaries
-                    related_instance = cls.dict_to_ogm(item, target_ogm_class, processed_objects, new_max_depth)
-                    if related_instance:
-                        cls._connect_related_instance(rel_manager, related_instance)
+                related_instance = cls.dict_to_ogm(item, target_ogm_class, processed_objects, new_max_depth)
+                if related_instance:
+                    cls._connect_related_instance(rel_manager, related_instance)
 
     @classmethod
     def _connect_related_instance(cls, rel_manager: Any, related_instance: OGM_Model) -> None:
