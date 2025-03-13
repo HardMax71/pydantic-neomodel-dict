@@ -645,8 +645,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                 target_ogm_class = rel.definition['node_class']
                 target_pydantic_class = cls._ogm_to_pydantic.get(target_ogm_class)
                 if not target_pydantic_class:
-                    logger.warning(f"No Pydantic model registered for OGM class {target_ogm_class.__name__}")
-                    continue
+                    raise ConversionError(f"No Pydantic model registered for OGM class {target_ogm_class.__name__}")
 
                 # Determine relationship cardinality
                 field_type = pydantic_fields.get(rel_name)
