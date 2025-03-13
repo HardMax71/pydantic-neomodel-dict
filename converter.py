@@ -6,7 +6,7 @@ with support for relationships, nested models, and custom type conversions.
 """
 import logging
 from datetime import datetime
-from typing import Type, Dict, List, Any, Optional, Union, Tuple, get_type_hints, Callable, Set, Generic, TypeVar
+from typing import Type, Dict, List, Any, Optional, Tuple, get_type_hints, Callable, Set, Generic, TypeVar
 
 from neomodel import (
     StructuredNode, db
@@ -173,7 +173,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
     @classmethod
     def to_ogm(
             cls,
-            pydantic_instance: BaseModel,  # Change from PydanticModel to BaseModel
+            pydantic_instance: BaseModel,
             ogm_class: Optional[Type[OGM_Model]] = None,
             processed_objects: Optional[Dict[int, OGM_Model]] = None,
             max_depth: int = 10
@@ -192,9 +192,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Returns:
             Optional[OGM_Model]: The converted neomodel OGM model instance.
         """
-        if pydantic_instance is None:
-            return None
-
         if max_depth <= 0:
             logger.info(f"Maximum recursion depth reached for {type(pydantic_instance).__name__}")
             return None
@@ -242,20 +239,15 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         ogm_instance.save()
 
         # Process relationships if we have depth remaining.
-        sentinel = object()
         ogm_relationships = ogm_class.defined_properties(aliases=False, rels=True, properties=False)
-        for rel_name, rel in ogm_relationships.items():
-            # Skip inverse relationships since they are automatically managed.
-            # if isinstance(rel, RelationshipFrom):
-            #    continue
+        common_attrs = set(ogm_relationships) & set(pydantic_instance.model_fields.keys())
 
-            rel_data = getattr(pydantic_instance, rel_name, sentinel)
-            if rel_data is sentinel:
-                logger.warning(f"Failed to get relationship {rel_name}")
-                continue
+        for rel_name in common_attrs:
+            rel_data: None | BaseModel | List[BaseModel] = getattr(pydantic_instance, rel_name)
             if rel_data is None:
                 continue
 
+            rel = ogm_relationships[rel_name]
             target_ogm_class = rel.definition['node_class']
 
             # Normalize to list if needed.
@@ -281,7 +273,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
     @classmethod
     def _process_related_item(
             cls,
-            item: Union[BaseModel, Dict[str, Any]],
+            item: BaseModel,
             ogm_instance: OGM_Model,
             rel_name: str,
             target_ogm_class: Type[StructuredNode],
@@ -293,7 +285,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Process a single related item and connect it to the OGM instance if successful.
 
         Args:
-            item: The item to process (BaseModel or dict)
+            item: The item to process (BaseModel)
             ogm_instance: The OGM instance to connect the related item to
             rel_name: The name of the relationship
             target_ogm_class: The target OGM class
@@ -305,46 +297,24 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             bool: Whether the item was successfully processed and connected
         """
         rel_manager = getattr(ogm_instance, rel_name)
-        if isinstance(item, BaseModel):
-            # Handle self–references: if the item is the same as the parent, simply connect.
-            if id(item) == instance_id:
-                rel_manager.connect(ogm_instance)
-                return True
+        # Handle self–references: if the item is the same as the parent, simply connect.
+        if id(item) == instance_id:
+            rel_manager.connect(ogm_instance)
+            return True
 
-            related_instance = cls.to_ogm(
-                item,
-                target_ogm_class,
-                processed_objects,
-                max_depth
-            )
-            if related_instance:
-                if isinstance(rel_manager, (ZeroOrOne, One, AsyncZeroOrOne, AsyncOne)):
-                    # Use replace to remove any existing node and connect the new one.
-                    rel_manager.replace(related_instance)
-                else:
-                    rel_manager.connect(related_instance)
-                return True
-        elif isinstance(item, dict):
-            target_pydantic_class = cls._ogm_to_pydantic.get(target_ogm_class)
-            if target_pydantic_class and isinstance(item, dict):
-                related_pydantic = target_pydantic_class(**item)
-                related_instance = cls.to_ogm(
-                    related_pydantic,
-                    target_ogm_class,
-                    processed_objects,
-                    max_depth  # Use the caller's decremented depth.
-                )
-                if related_instance:
-                    if isinstance(rel_manager, (ZeroOrOne, One, AsyncZeroOrOne, AsyncOne)):
-                        # Use replace to remove any existing node and connect the new one.
-                        rel_manager.replace(related_instance)
-                    else:
-                        rel_manager.connect(related_instance)
-                    return True
-
-                raise ConversionError(f"Failed to process dict item in relationship {rel_name}")
+        related_instance = cls.to_ogm(
+            item,
+            target_ogm_class,
+            processed_objects,
+            max_depth
+        )
+        if related_instance:
+            if isinstance(rel_manager, (ZeroOrOne, One, AsyncZeroOrOne, AsyncOne)):
+                # Use replace to remove any existing node and connect the new one.
+                rel_manager.replace(related_instance)
             else:
-                raise ConversionError(f"No Pydantic model registered for OGM class {target_ogm_class.__name__}")
+                rel_manager.connect(related_instance)
+            return True
         return False
 
     @classmethod
