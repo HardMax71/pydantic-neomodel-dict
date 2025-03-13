@@ -576,10 +576,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Returns:
             Converted Pydantic model instance or None if input is None
         """
-        # Handle null case
-        if ogm_instance is None:
-            return None
-
         if max_depth <= 0:
             logger.info(f"Maximum recursion depth reached for {type(ogm_instance).__name__}")
             return None
@@ -741,9 +737,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Returns:
             A dictionary representation of the OGM instance or None if input is None
         """
-        if ogm_instance is None:
-            return None
-
         processed_objects = processed_objects or {}
         current_path = current_path or []
         instance_id = ogm_instance.element_id
