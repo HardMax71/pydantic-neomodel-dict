@@ -6,7 +6,7 @@ with support for relationships, nested models, and custom type conversions.
 """
 import logging
 from datetime import datetime
-from typing import Type, Dict, List, Any, Optional, Tuple, get_type_hints, Callable, Set, Generic, TypeVar
+from typing import Type, Dict, List, Any, Optional, Tuple, get_type_hints, Callable, Set, Generic, TypeVar, get_origin
 
 from neomodel import (
     StructuredNode, db
@@ -321,19 +321,12 @@ class Converter(Generic[PydanticModel, OGM_Model]):
     def _create_minimal_pydantic_instance(
             cls,
             ogm_instance: OGM_Model,
-            pydantic_class: Optional[Type[BaseModel]] = None
+            pydantic_class: Type[BaseModel]
     ) -> BaseModel:
         """
         Create a minimal Pydantic instance with only essential properties.
         Used for cycle breaking and max depth handling.
         """
-        # Resolve Pydantic class if not provided
-        if pydantic_class is None:
-            ogm_class = type(ogm_instance)
-            if ogm_class not in cls._ogm_to_pydantic:
-                raise ConversionError(f"No mapping registered for OGM class {ogm_class.__name__}")
-            pydantic_class = cls._ogm_to_pydantic[ogm_class]
-
         # Extract essential properties
         sentinel = object()
         ogm_properties = type(ogm_instance).defined_properties(rels=False, aliases=False)
@@ -367,37 +360,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             if prop_name in pydantic_fields
             if (value := getattr(ogm_instance, prop_name, sentinel)) is not sentinel
         }
-
-    @classmethod
-    def _is_list_type(cls, field_type: Any) -> bool:
-        """
-        Determine if a field type is a List type using proper typing inspection.
-
-        Args:
-            field_type: The field type annotation
-
-        Returns:
-            True if the field is a list type, False otherwise
-        """
-        # Check for standard list type
-        if field_type is list:
-            return True
-
-        # Handle typing.List
-        try:
-            import typing
-            if hasattr(typing, 'get_origin') and hasattr(typing, 'List'):  # Python 3.8+
-                origin = typing.get_origin(field_type)
-                return origin is list or origin is typing.List
-            # For Python 3.7 and below
-            elif hasattr(field_type, "__origin__"):
-                return field_type.__origin__ is list
-        except (ImportError, AttributeError):
-            pass
-
-        # Fallback: check string representation (less ideal but works as last resort)
-        field_str = str(field_type)
-        return field_str.startswith('typing.List') or field_str.startswith('List[')
 
     @classmethod
     def batch_to_pydantic(
@@ -690,7 +652,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
                 # Determine relationship cardinality
                 field_type = pydantic_fields.get(rel_name)
-                is_list = cls._is_list_type(field_type)
+                is_list = any([get_origin(field_type) is list, field_type is list])
                 is_single = not is_list
 
                 # If we can't determine from field type, fall back to OGM cardinality check
