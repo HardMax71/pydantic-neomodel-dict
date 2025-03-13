@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import pytest
 from neomodel import (
-    StructuredNode, StringProperty, IntegerProperty, FloatProperty, BooleanProperty,
+    StructuredNode, StringProperty, IntegerProperty, FloatProperty, BooleanProperty, DateProperty,
     RelationshipTo, ZeroOrOne
 )
 from pydantic import BaseModel, Field
@@ -116,7 +116,7 @@ class TypesOGM(StructuredNode):
     int_val = IntegerProperty()
     float_val = FloatProperty()
     bool_val = BooleanProperty()
-    date_val = StringProperty()  # Stored as string
+    date_val = DateProperty()
 
 
 # Models for error cases test
@@ -375,14 +375,14 @@ class TestComprehensive:
         assert types_ogm.int_val == 42, "Float not converted to int"
         assert types_ogm.float_val == 42.5, "String not converted to float"
         assert types_ogm.bool_val is False, "Int not converted to bool"
-        assert types_ogm.date_val == today.isoformat(), "Date not converted to string"
+        assert types_ogm.date_val == today, "Date not preserved as date object"
 
         # Verify types
         assert isinstance(types_ogm.string_val, str), "string_val type incorrect"
         assert isinstance(types_ogm.int_val, int), "int_val type incorrect"
         assert isinstance(types_ogm.float_val, float), "float_val type incorrect"
         assert isinstance(types_ogm.bool_val, bool), "bool_val type incorrect"
-        assert isinstance(types_ogm.date_val, str), "date_val type incorrect"
+        assert isinstance(types_ogm.date_val, date), "date_val type incorrect"
 
     def test_error_cases(self, db_connection):
         """

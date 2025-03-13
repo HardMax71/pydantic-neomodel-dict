@@ -13,8 +13,7 @@ from neomodel import (
 )
 from neomodel import ZeroOrOne, One, AsyncZeroOrOne, AsyncOne
 from neomodel.properties import (
-    StringProperty, IntegerProperty, FloatProperty, BooleanProperty,
-    DateTimeProperty, ArrayProperty, JSONProperty
+    DateTimeProperty, ArrayProperty, JSONProperty, Property, DateProperty
 )
 from pydantic import BaseModel
 
@@ -75,7 +74,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         logger.debug(f"Registered type converter: {source_type.__name__} -> {target_type.__name__}")
 
     @classmethod
-    def _get_property_type(cls, prop: Any) -> Any:  # Return Any instead of Type to fix error
+    def _get_property_type(cls, prop: Property) -> Any:  # Return Any instead of Type to fix error
         """
         Determine the Python type corresponding to a neomodel property.
 
@@ -86,27 +85,19 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             Type: The Python type associated with the property.
         """
         # Map neomodel property types to Python types
-        if isinstance(prop, StringProperty):
-            return str
-        elif isinstance(prop, IntegerProperty):
-            return int
-        elif isinstance(prop, FloatProperty):
-            return float
-        elif isinstance(prop, BooleanProperty):
-            return bool
-        elif isinstance(prop, DateTimeProperty):
-            return datetime
-        elif isinstance(prop, ArrayProperty):
-            return list
-        elif isinstance(prop, JSONProperty):
-            return dict
-
-        # For any other property types, try to get the type from the property_type attribute
-        # or use Any as a fallback
-        try:
-            return getattr(prop, 'property_type')
-        except (AttributeError, TypeError):
-            return Any
+        # str, int, float, bool - work ok, so return them as Any
+        # datetime/date/array/json - require dumb conversion, TODO: find out simpler way
+        match prop:
+            case DateProperty():
+                return datetime.date
+            case DateTimeProperty():
+                return datetime
+            case ArrayProperty():
+                return list
+            case JSONProperty():
+                return dict
+            case _:
+                return Any
 
     @classmethod
     def _convert_value(cls, value: Any, target_type: Any) -> Any:
