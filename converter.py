@@ -218,7 +218,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         pydantic_data: Dict[str, Any] = {}
         try:
             pydantic_data = pydantic_instance.model_dump(exclude_unset=True, exclude_none=True)
-        except ValueError as e:
+        except ValueError:
             # Detected circular dependency
             # Who throws: https://github.com/pydantic/pydantic-core/blob/53bdfa62abefe061575d51cdb9d59b72000295ee/src/serializers/extra.rs#L183-L197
             for field_name in pydantic_instance.model_fields.keys():
