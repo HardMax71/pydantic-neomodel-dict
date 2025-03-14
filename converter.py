@@ -489,14 +489,8 @@ class Converter(Generic[PydanticModel, OGM_Model]):
     def _connect_related_instance(cls, rel_manager: Any, related_instance: OGM_Model) -> None:
         """Helper method to connect a related instance to a relationship manager"""
         if isinstance(rel_manager, (ZeroOrOne, One, AsyncZeroOrOne, AsyncOne)):
-            try:
-                # Disconnect all previously connected nodes for one-to-one relationships
-                rel_manager.disconnect_all()
-            except Exception as e:
-                logger.debug(f"Could not disconnect existing relationships: {e}")
-            rel_manager.connect(related_instance)
-        else:
-            rel_manager.connect(related_instance)
+            rel_manager.disconnect_all()
+        rel_manager.connect(related_instance)
 
     @classmethod
     def dict_to_ogm(

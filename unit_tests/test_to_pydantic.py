@@ -255,3 +255,24 @@ class TestCycleDetection:
 
         # Verify it's a different object
         assert id(pydantic_a) != id(minimal_instance)
+
+    def test_to_pydantic_no_mapping_registered(self, db_connection):
+        """
+        Test that to_pydantic raises a ConversionError when no mapping is registered
+        for the OGM class and pydantic_class is not provided.
+        """
+
+        # Define a class that isn't registered
+        class UnregisteredOGM2(StructuredNode):
+            name = StringProperty()
+
+        # Create an instance
+        unregistered = UnregisteredOGM2(name="Unregistered").save()
+
+        # Attempt conversion without providing pydantic_class - should raise ConversionError
+        with pytest.raises(ConversionError) as excinfo:
+            Converter.to_pydantic(unregistered)
+
+        # Verify error message
+        assert "No mapping registered for OGM class" in str(excinfo.value)
+        assert "UnregisteredOGM" in str(excinfo.value)

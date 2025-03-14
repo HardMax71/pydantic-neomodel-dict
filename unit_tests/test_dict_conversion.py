@@ -124,7 +124,7 @@ class TestDictConversion:
         assert user_ogm.email == "john@example.com", "Email not preserved"
         assert user_ogm.age == 30, "Age not preserved"
 
-        # Invalid type conversion will raise error and it's not the part of converter - to convert erroneous data
+        # Invalid type conversion will raise error and it's not the part of converter - to convert errones
         # to specified data types
 
     def test_ogm_to_dict(self, db_connection):
@@ -209,6 +209,7 @@ class TestDictConversion:
 
         # The cycle should be detected and handled (either by empty dict or by reference to already processed node)
         assert "links_to" in result_dict["links_to"][0]["links_to"][0], "Cycle detection failed"
+
 
     def test_batch_dict_conversion(self, db_connection, item_dicts):
         """

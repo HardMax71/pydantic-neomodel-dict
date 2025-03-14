@@ -401,3 +401,28 @@ class TestEdgeCaseRelationshipValues:
         # This may raise an exception depending on how strict the implementation is
         with pytest.raises(Exception):
             Converter.dict_to_ogm(data, RelValPersonOGM)
+
+    def test_dict_with_self_reference(self, db_connection):
+        """Test with dictionary containing a direct self-reference (should handle gracefully)"""
+        # Create a dictionary with a direct self-reference
+        data = {}
+        data["name"] = "John Doe"
+        data["age"] = 30
+        data["managed_by"] = data  # Self-reference: data refers to itself
+
+        # Convert to OGM - should handle the cycle gracefully
+        result = Converter.dict_to_ogm(data, RelValPersonOGM)
+
+        # Verify the result
+        assert result is not None
+        assert isinstance(result, RelValPersonOGM)
+        assert result.name == "John Doe"
+        assert result.age == 30
+
+        # Verify self-relationship was created
+        managers = list(result.managed_by.all())
+        assert len(managers) == 1
+
+        # The manager should be the same node (self-reference)
+        assert managers[0].element_id == result.element_id
+
