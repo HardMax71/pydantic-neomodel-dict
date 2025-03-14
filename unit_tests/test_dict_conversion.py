@@ -285,3 +285,32 @@ class TestDictConversion:
         # Verify shallow conversion only includes properties
         assert "title" in shallow, "Title property missing in shallow conversion"
         assert "tags" not in shallow, "Relationships should be excluded in shallow conversion"
+
+    def test_dict_to_ogm_max_depth(self, db_connection):
+        """Test max_depth parameter in dict_to_ogm to ensure it stops at specified depth"""
+        # Create a deeply nested dictionary structure
+        level3 = {"name": "Level 3 Node", "links_to": []}
+        level2 = {"name": "Level 2 Node", "links_to": [level3]}
+        level1 = {"name": "Level 1 Node", "links_to": [level2]}
+        root = {"name": "Root Node", "links_to": [level1]}
+
+        # Convert with max_depth=2 (should convert root and level1, but not level2's relationships)
+        result = Converter.dict_to_ogm(root, NodeOGM_DictTest, max_depth=2)
+
+        # Verify the root and level1 were converted
+        assert result is not None
+        assert result.name == "Root Node"
+
+        # Check level1 nodes
+        level1_nodes = list(result.links_to.all())
+        assert len(level1_nodes) == 1
+        assert level1_nodes[0].name == "Level 1 Node"
+
+        # Check level2 nodes (should exist as nodes, but without relationships)
+        level2_nodes = list(level1_nodes[0].links_to.all())
+        assert len(level2_nodes) == 1
+        assert level2_nodes[0].name == "Level 2 Node"
+
+        # Check level3 nodes - should not exist because level2's relationships weren't processed
+        level3_nodes = list(level2_nodes[0].links_to.all())
+        assert len(level3_nodes) == 0  # Nothing at level 3 due to max_depth=2

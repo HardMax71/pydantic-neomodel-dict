@@ -219,11 +219,10 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         try:
             pydantic_data = pydantic_instance.model_dump(exclude_unset=True, exclude_none=True)
         except ValueError as e:
-            if "Circular reference detected" in str(e):
-                for field_name in pydantic_instance.model_fields.keys():
-                    cls._process_pydantic_field(pydantic_instance, field_name, pydantic_data)
-            else:
-                raise ConversionError(f"Failed to get dictionary from Pydantic model: {str(e)}")
+            # Detected circular dependency
+            # Who throws: https://github.com/pydantic/pydantic-core/blob/53bdfa62abefe061575d51cdb9d59b72000295ee/src/serializers/extra.rs#L183-L197
+            for field_name in pydantic_instance.model_fields.keys():
+                cls._process_pydantic_field(pydantic_instance, field_name, pydantic_data)
 
         ogm_properties = ogm_class.defined_properties(rels=False, aliases=False)
         for prop_name, prop in ogm_properties.items():
@@ -515,7 +514,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Returns:
             A new or updated OGM model instance, or None if input is None
         """
-        if max_depth <= 0:
+        if max_depth < 0:
             logger.warning("Maximum recursion depth reached during dict_to_ogm conversion")
             return None
 
