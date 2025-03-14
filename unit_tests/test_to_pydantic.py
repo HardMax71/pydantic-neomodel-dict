@@ -1,3 +1,5 @@
+from typing import Optional
+
 import pytest
 from neomodel import (
     StructuredNode, StringProperty, IntegerProperty, BooleanProperty,
@@ -53,6 +55,11 @@ class NodeBOGM(StructuredNode):
 
     # Relationship back to NodeA (creates cycle)
     to_a = RelationshipTo(NodeAOGM, 'CONNECTS_TO', cardinality=One)
+
+
+class UnregisteredCyclicOGM(StructuredNode):
+    name = StringProperty(required=True)
+    refers_to = RelationshipTo('UnregisteredCyclicOGM', 'REFERS_TO')
 
 
 # ===== Test Class =====
@@ -276,3 +283,60 @@ class TestCycleDetection:
         # Verify error message
         assert "No mapping registered for OGM class" in str(excinfo.value)
         assert "UnregisteredOGM" in str(excinfo.value)
+
+    def test_to_pydantic_cycle_with_no_class_mapping(self, db_connection):
+        """
+        Test that a ConversionError is raised when a cycle is detected in to_pydantic,
+        no explicit pydantic_class is provided, and the OGM class has no registered mapping.
+        """
+        # Create an instance with a self-reference to create a cycle
+        cyclic_node = UnregisteredCyclicOGM(name="CyclicNode").save()
+        cyclic_node.refers_to.connect(cyclic_node)
+
+        # Create a separate unregistered Pydantic model that could be passed explicitly
+        class UnregisteredCyclicModel(BaseModel):
+            name: str
+            refers_to: Optional['UnregisteredCyclicModel'] = None
+
+        UnregisteredCyclicModel.model_rebuild()  # Resolve forward references
+
+        # Clear registrations to ensure no mapping exists
+        original_mappings = Converter._ogm_to_pydantic.copy()
+        Converter._ogm_to_pydantic = {}
+
+        try:
+            # Call to_pydantic without providing pydantic_class - should raise ConversionError
+            with pytest.raises(ConversionError) as excinfo:
+                Converter.to_pydantic(cyclic_node)
+
+            # Verify error message
+            assert "No mapping registered for OGM class" in str(excinfo.value)
+            assert "UnregisteredCyclicOGM" in str(excinfo.value)
+
+            # Register the model temporarily for the explicit test
+            Converter._ogm_to_pydantic[UnregisteredCyclicOGM] = UnregisteredCyclicModel
+
+            # Now this should work with the mapping in place
+            result = Converter.to_pydantic(cyclic_node, UnregisteredCyclicModel)
+
+            # Detailed assertions about the result
+            assert result is not None, "Result should not be None"
+            assert isinstance(result,
+                              UnregisteredCyclicModel), "Result should be an instance of UnregisteredCyclicModel"
+            assert result.name == "CyclicNode", "Root object name should match original"
+
+            # Check the self-reference
+            assert result.refers_to is not None, "Self-reference should not be None"
+            assert isinstance(result.refers_to,
+                              UnregisteredCyclicModel), "Self-reference should be an instance of UnregisteredCyclicModel"
+            assert result.refers_to.name == "CyclicNode", "Self-reference name should match original"
+
+            # Verify that objects are distinct (proves cycle detection worked)
+            assert id(result) != id(result.refers_to), "Result and its reference should be distinct objects"
+
+            # Verify that the cycle is properly terminated
+            assert result.refers_to.refers_to is None, "The cycle should be terminated at the first level"
+
+        finally:
+            # Restore original mappings
+            Converter._ogm_to_pydantic = original_mappings
