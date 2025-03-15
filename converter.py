@@ -444,7 +444,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             # Reason for that is 0/1-1, 1-1 relations may only be added to rel.manager only in case when
             # They were disconnected before. In any other case, you will get  AttemptedCardinalityViolation
             # thrown.
-            rel_manager.connect(related_instance)
+            rel_manager.disconnect(related_instance)
         rel_manager.connect(related_instance)
 
     @classmethod
