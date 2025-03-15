@@ -7,7 +7,7 @@ with support for relationships, nested models, and custom type conversions.
 import logging
 from typing import Type, Dict, List, Any, Optional, Tuple, get_type_hints, Callable, Set, Generic, TypeVar, get_origin
 
-from neomodel import StructuredNode, db, ZeroOrOne, One, AsyncZeroOrOne, AsyncOne
+from neomodel import StructuredNode, db, ZeroOrOne, One, AsyncZeroOrOne, AsyncOne, RelationshipManager
 from pydantic import BaseModel
 
 # Type variables for generic typing
@@ -198,31 +198,28 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         cls._set_ogm_attrs_and_save_model(pydantic_data, ogm_instance)
 
         # Process relationships if we have depth remaining.
-        ogm_relationships = ogm_class.defined_properties(aliases=False, rels=True, properties=False)
-        common_attrs = set(ogm_relationships.keys()) & set(pydantic_instance.model_fields.keys())
+        relationships = ogm_class.defined_properties(aliases=False, rels=True, properties=False)
+        common_attrs = set(relationships) & set(pydantic_instance.model_fields)
 
         for rel_name in common_attrs:
-            rel_data: None | BaseModel | List[BaseModel] = getattr(pydantic_instance, rel_name)
-            if rel_data is None:
+            rel_data = getattr(pydantic_instance, rel_name)
+            if not rel_data:
                 continue
 
-            rel = ogm_relationships[rel_name]
-            target_ogm_class = rel.definition['node_class']
+            target_ogm_class = relationships[rel_name].definition['node_class']
+            items = rel_data if isinstance(rel_data, list) else [rel_data]
 
-            # Normalize to list if needed.
-            if not isinstance(rel_data, list):
-                rel_data = [rel_data]
-
-            new_max_depth = max_depth - 1  # Decrement depth only once.
-            for item in rel_data:
+            # Decrement the depth once for all items.
+            new_max_depth = max_depth - 1
+            for item in items:
                 cls._process_related_item(
                     item,
                     ogm_instance,
                     rel_name,
                     target_ogm_class,
                     processed_objects,
-                    new_max_depth,  # Pass new_max_depth directly.
-                    instance_id
+                    new_max_depth,
+                    id(pydantic_instance)
                 )
 
         # Save the complete object after processing relationships.
@@ -268,11 +265,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             max_depth
         )
         if related_instance:
-            if isinstance(rel_manager, (ZeroOrOne, One, AsyncZeroOrOne, AsyncOne)):
-                # Use replace to remove any existing node and connect the new one.
-                rel_manager.replace(related_instance)
-            else:
-                rel_manager.connect(related_instance)
+            cls._connect_related_instance(rel_manager, related_instance)
             return True
         return False
 
@@ -416,9 +409,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                 continue
 
             rel_data = data_dict[rel_name]
-            target_ogm_class = rel.definition['node_class']
-            rel_manager = getattr(ogm_instance, rel_name)
-
             # Validate relationship data type - must be dict or list
             if not isinstance(rel_data, (dict, list)):
                 raise ConversionError(
@@ -426,30 +416,34 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                     f"got {type(rel_data).__name__}"
                 )
 
-            # Normalize to list if needed
-            if not isinstance(rel_data, list):
-                rel_data = [rel_data]
+            target_ogm_class = rel.definition['node_class']
+            rel_manager = getattr(ogm_instance, rel_name)
 
-            # Validate all items in the list are dictionaries
-            for i, item in enumerate(rel_data):
+            # Normalize to list if needed
+            items = rel_data if isinstance(rel_data, list) else [rel_data]
+
+            new_max_depth = max_depth - 1
+            for i, item in enumerate(items):
+                # First checking of relationship is valid (has to be dict), if not - raising error
                 if not isinstance(item, dict):
                     raise ConversionError(
                         f"Relationship '{rel_name}' list item {i} must be a dictionary, "
                         f"got {type(item).__name__}"
                     )
 
-            new_max_depth = max_depth - 1
-            for item in rel_data:
+                # If relationship seems to be correct - try to convert it too
                 related_instance = cls.dict_to_ogm(item, target_ogm_class, processed_objects, new_max_depth)
                 if related_instance:
                     cls._connect_related_instance(rel_manager, related_instance)
 
     @classmethod
-    def _connect_related_instance(cls, rel_manager: Any, related_instance: OGM_Model) -> None:
+    def _connect_related_instance(cls, rel_manager: RelationshipManager, related_instance: OGM_Model) -> None:
         """Helper method to connect a related instance to a relationship manager"""
         if isinstance(rel_manager, (ZeroOrOne, One, AsyncZeroOrOne, AsyncOne)):
-            rel_manager.disconnect_all()
-        rel_manager.connect(related_instance)
+            # Use replace to remove any existing node and connect the new one.
+            rel_manager.replace(related_instance)
+        else:
+            rel_manager.connect(related_instance)
 
     @classmethod
     def dict_to_ogm(
@@ -523,6 +517,8 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             value = data_dict[prop_name]
             setattr(ogm_instance, prop_name, value)
         # Save properties before processing relationships
+        # Not doing so will lead to error about using unsaved `neomodel` node during next step:
+        # Saving relationships
         ogm_instance.save()
 
     @classmethod
@@ -563,19 +559,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         if instance_id in processed_objects and instance_id not in current_path:
             return processed_objects[instance_id]
 
-        # Handle cycle detection - create minimal instance with just key properties
-        if instance_id in current_path:
-            if pydantic_class is None:
-                ogm_class = type(ogm_instance)
-                if ogm_class not in cls._ogm_to_pydantic:
-                    raise ConversionError(f"No mapping registered for OGM class {ogm_class.__name__}")
-                pydantic_class = cls._ogm_to_pydantic[ogm_class]
-
-            # Create a new stub instance for this cycle instance
-            # Important: we DO NOT store this in processed_objects to keep them distinct
-            stub_instance = cls._create_minimal_pydantic_instance(ogm_instance, pydantic_class)
-            return stub_instance
-
         # Resolve Pydantic class if not provided
         if pydantic_class is None:
             ogm_class = type(ogm_instance)
@@ -583,15 +566,24 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                 raise ConversionError(f"No mapping registered for OGM class {ogm_class.__name__}")
             pydantic_class = cls._ogm_to_pydantic[ogm_class]
 
+        # Handle cycle detection - create minimal instance with just key properties
+        if instance_id in current_path:
+
+            # Create a new stub instance for this cycle instance
+            # Important: we DO NOT store this in processed_objects to keep them distinct
+            stub_instance = cls._create_minimal_pydantic_instance(ogm_instance, pydantic_class)
+            return stub_instance
+
         # Create namespace for type resolution
+        # Need this weird magic cause `neomodel` saves all Nodes in sort of global dict for whatever reason
         local_namespace = {cls.__name__: cls for cls in cls._pydantic_to_ogm.keys()}
         local_namespace[pydantic_class.__name__] = pydantic_class
 
         # Get field types from Pydantic model
-        pydantic_fields = get_type_hints(pydantic_class, globalns=None, localns=local_namespace)
+        pydantic_type_hints = get_type_hints(pydantic_class, globalns=None, localns=local_namespace)
 
         # Extract and convert properties
-        pydantic_data = cls._get_property_data(ogm_instance, pydantic_fields)
+        pydantic_data = cls._get_property_data(ogm_instance, pydantic_type_hints)
 
         # Create a minimal instance first and register it immediately to handle circular refs
         minimal_instance = pydantic_class.model_validate(pydantic_data)
@@ -607,7 +599,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             # Process relationships with unified approach
             for rel_name, rel in ogm_relationships.items():
                 # Skip relationships not in Pydantic model
-                if rel_name not in pydantic_fields:
+                if rel_name not in pydantic_type_hints:
                     continue
 
                 # Get target class information
@@ -617,7 +609,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                     raise ConversionError(f"No Pydantic model registered for OGM class {target_ogm_class.__name__}")
 
                 # Determine relationship cardinality
-                field_type = pydantic_fields.get(rel_name)
+                field_type = pydantic_type_hints.get(rel_name)
                 is_single = not any([get_origin(field_type) is list, field_type is list])
 
                 # Get related objects
