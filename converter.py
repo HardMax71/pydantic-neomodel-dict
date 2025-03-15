@@ -5,16 +5,9 @@ This module provides a utility for converting between Pydantic models and Neo4j 
 with support for relationships, nested models, and custom type conversions.
 """
 import logging
-from datetime import datetime
 from typing import Type, Dict, List, Any, Optional, Tuple, get_type_hints, Callable, Set, Generic, TypeVar, get_origin
 
-from neomodel import (
-    StructuredNode, db
-)
-from neomodel import ZeroOrOne, One, AsyncZeroOrOne, AsyncOne
-from neomodel.properties import (
-    DateTimeProperty, ArrayProperty, JSONProperty, Property, DateProperty
-)
+from neomodel import StructuredNode, db, ZeroOrOne, One, AsyncZeroOrOne, AsyncOne
 from pydantic import BaseModel
 
 # Type variables for generic typing
@@ -76,32 +69,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         """
         cls._type_converters[(source_type, target_type)] = converter_func
         logger.debug(f"Registered type converter: {source_type.__name__} -> {target_type.__name__}")
-
-    @classmethod
-    def _get_property_type(cls, prop: Property) -> Any:  # Return Any instead of Type to fix error
-        """
-        Determine the Python type corresponding to a neomodel property.
-
-        Args:
-            prop (Any): A neomodel property.
-
-        Returns:
-            Type: The Python type associated with the property.
-        """
-        # Map neomodel property types to Python types
-        # str, int, float, bool - work ok, so return them as Any
-        # datetime/date/array/json - require dumb conversion, TODO: find out simpler way
-        match prop:
-            case DateProperty():
-                return datetime.date
-            case DateTimeProperty():
-                return datetime
-            case ArrayProperty():
-                return list
-            case JSONProperty():
-                return dict
-            case _:
-                return Any
 
     @classmethod
     def _convert_value(cls, value: Any, target_type: Type[T]) -> Any:
@@ -232,7 +199,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
         # Process relationships if we have depth remaining.
         ogm_relationships = ogm_class.defined_properties(aliases=False, rels=True, properties=False)
-        common_attrs = set(ogm_relationships) & set(pydantic_instance.model_fields.keys())
+        common_attrs = set(ogm_relationships.keys()) & set(pydantic_instance.model_fields.keys())
 
         for rel_name in common_attrs:
             rel_data: None | BaseModel | List[BaseModel] = getattr(pydantic_instance, rel_name)
@@ -536,7 +503,22 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
     @classmethod
     def _set_ogm_attrs_and_save_model(cls, data_dict: dict, ogm_instance: OGM_Model):
-        # Process properties, keys for which exist in both OGM and data ditct
+        """
+        Set attributes on the OGM model instance from the provided data dictionary and save the instance.
+
+        This method iterates over the intersection of the keys in the data dictionary and the defined properties
+        (excluding relationships and aliases) of the OGM instance. For each matching key, it sets the corresponding
+        attribute on the OGM instance with the value from the dictionary. After updating all applicable attributes,
+        the method saves the OGM instance to persist the changes.
+
+        Args:
+            data_dict (dict): A dictionary containing property names and their corresponding values.
+            ogm_instance (OGM_Model): The target neomodel OGM model instance to update and save.
+
+        Returns:
+            None
+        """
+        # Process properties, keys for which exist in both OGM and data dict
         for prop_name in ogm_instance.defined_properties(rels=False, aliases=False).keys() & data_dict.keys():
             value = data_dict[prop_name]
             setattr(ogm_instance, prop_name, value)
