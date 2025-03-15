@@ -21,6 +21,10 @@ from pydantic import BaseModel
 PydanticModel = TypeVar('PydanticModel', bound=BaseModel)
 OGM_Model = TypeVar('OGM_Model', bound=StructuredNode)
 
+# Types for type converters
+S = TypeVar("S")
+T = TypeVar("T")
+
 # Configure logger
 logger = logging.getLogger(__name__)
 
@@ -55,9 +59,9 @@ class Converter(Generic[PydanticModel, OGM_Model]):
     @classmethod
     def register_type_converter(
             cls,
-            source_type: Type,
-            target_type: Type,
-            converter_func: Callable[[Any], Any]
+            source_type: Type[S],
+            target_type: Type[T],
+            converter_func: Callable[[S], T]
     ) -> None:
         """
         Register a custom type converter function.
@@ -100,13 +104,13 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                 return Any
 
     @classmethod
-    def _convert_value(cls, value: Any, target_type: Any) -> Any:
+    def _convert_value(cls, value: Any, target_type: Type[T]) -> Any:
         """
         Convert the given value to the specified target type using registered converters if available.
 
         Args:
             value (Any): The value to convert.
-            target_type (Type): The target type to which the value should be converted.
+            target_type (Type[T]): The target type to which the value should be converted.
 
         Returns:
             Any: The converted value.
@@ -224,18 +228,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             for field_name in pydantic_instance.model_fields.keys():
                 cls._process_pydantic_field(pydantic_instance, field_name, pydantic_data)
 
-        ogm_properties = ogm_class.defined_properties(rels=False, aliases=False)
-        for prop_name, prop in ogm_properties.items():
-            if prop_name in pydantic_data:
-                value = pydantic_data[prop_name]
-                # Any neomodel OGM field is successor of Property class, implementing `deflate()` method,
-                # That returns value of field as python type.
-                # TODO: maybe to replace with: setattr(ogm_instance, prop_name, prop.deflate(value))
-                prop_type = cls._get_property_type(prop)
-                setattr(ogm_instance, prop_name, cls._convert_value(value, prop_type))
-
-        # Save the object with properties before processing relationships.
-        ogm_instance.save()
+        cls._set_ogm_attrs_and_save_model(pydantic_data, ogm_instance)
 
         # Process relationships if we have depth remaining.
         ogm_relationships = ogm_class.defined_properties(aliases=False, rels=True, properties=False)
@@ -529,15 +522,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         ogm_instance = ogm_class()
         processed_objects[instance_id] = ogm_instance
 
-        # Process properties
-        for prop_name, prop in ogm_class.defined_properties(rels=False, aliases=False).items():
-            if prop_name in data_dict:
-                value = data_dict[prop_name]
-                prop_type = cls._get_property_type(prop)
-                setattr(ogm_instance, prop_name, cls._convert_value(value, prop_type))
-
-        # Save properties before processing relationships
-        ogm_instance.save()
+        cls._set_ogm_attrs_and_save_model(data_dict, ogm_instance)
 
         # Process relationships
         ogm_relationships = ogm_class.defined_properties(aliases=False, rels=True, properties=False)
@@ -548,6 +533,15 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         # Final save after all relationships are processed
         ogm_instance.save()
         return ogm_instance
+
+    @classmethod
+    def _set_ogm_attrs_and_save_model(cls, data_dict: dict, ogm_instance: OGM_Model):
+        # Process properties, keys for which exist in both OGM and data ditct
+        for prop_name in ogm_instance.defined_properties(rels=False, aliases=False).keys() & data_dict.keys():
+            value = data_dict[prop_name]
+            setattr(ogm_instance, prop_name, value)
+        # Save properties before processing relationships
+        ogm_instance.save()
 
     @classmethod
     def to_pydantic(

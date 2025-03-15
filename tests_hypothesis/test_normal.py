@@ -10,7 +10,7 @@ from hypothesis.strategies import lists, dictionaries, text, integers, floats, b
 from neomodel import (
     StructuredNode, StringProperty, IntegerProperty, FloatProperty, BooleanProperty,
     DateTimeProperty, RelationshipTo, RelationshipFrom, config, db, ArrayProperty, JSONProperty, StructuredRel,
-    ZeroOrOne
+    ZeroOrOne, DateProperty
 )
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -181,7 +181,7 @@ class PersonOGM(StructuredNode):
     # Date fields
     created_at = DateTimeProperty(default=datetime.datetime.now)
     updated_at = DateTimeProperty()
-    birth_date = DateTimeProperty()
+    birth_date = DateProperty()
 
     # Relationships
     # Fixed: Use proper cardinality classes instead of integer 1
