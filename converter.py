@@ -441,9 +441,11 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         """Helper method to connect a related instance to a relationship manager"""
         if isinstance(rel_manager, (ZeroOrOne, One, AsyncZeroOrOne, AsyncOne)):
             # Use replace to remove any existing node and connect the new one.
-            rel_manager.replace(related_instance)
-        else:
+            # Reason for that is 0/1-1, 1-1 relations may only be added to rel.manager only in case when
+            # They were disconnected before. In any other case, you will get  AttemptedCardinalityViolation
+            # thrown.
             rel_manager.connect(related_instance)
+        rel_manager.connect(related_instance)
 
     @classmethod
     def dict_to_ogm(
@@ -568,7 +570,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
         # Handle cycle detection - create minimal instance with just key properties
         if instance_id in current_path:
-
             # Create a new stub instance for this cycle instance
             # Important: we DO NOT store this in processed_objects to keep them distinct
             stub_instance = cls._create_minimal_pydantic_instance(ogm_instance, pydantic_class)
