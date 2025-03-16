@@ -2,11 +2,19 @@ from datetime import datetime
 from typing import List, Optional
 
 import pytest
-from neomodel import RelationshipTo, RelationshipFrom, Relationship, db
-from neomodel import StructuredNode, StringProperty, IntegerProperty, DateTimeProperty
+from neomodel import (
+    DateTimeProperty,
+    IntegerProperty,
+    Relationship,
+    RelationshipFrom,
+    RelationshipTo,
+    StringProperty,
+    StructuredNode,
+    db,
+)
 from pydantic import BaseModel, Field
 
-from converter import Converter, ConversionError
+from pydantic_neo4j_dict import ConversionError, Converter
 
 
 # Define test OGM models with unique names to avoid conflicts
@@ -425,4 +433,5 @@ class TestEdgeCaseRelationshipValues:
 
         # The manager should be the same node (self-reference)
         assert managers[0].element_id == result.element_id
+
 

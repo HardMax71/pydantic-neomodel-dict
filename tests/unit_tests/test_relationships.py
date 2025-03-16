@@ -1,11 +1,10 @@
 from typing import Optional
 
 import pytest
-from neomodel import StructuredNode, StringProperty, RelationshipTo, ZeroOrOne
+from neomodel import RelationshipTo, StringProperty, StructuredNode, ZeroOrOne
 from pydantic import BaseModel
 
-from converter import Converter
-
+from pydantic_neo4j_dict import Converter
 
 # ===== Module-level model definitions =====
 
@@ -21,16 +20,16 @@ class PersonPydantic(BaseModel):
     address: Optional[AddressPydantic] = None
 
 
-class AddressOGM(StructuredNode):
+class AddressRelationshipsOGM(StructuredNode):
     street = StringProperty(required=True)
     city = StringProperty(required=True)
     zip_code = StringProperty(required=True)
 
 
-class PersonOGM(StructuredNode):
+class PersonRelationshipsOGM(StructuredNode):
     name = StringProperty(required=True)
     email = StringProperty(unique_index=True)
-    address = RelationshipTo(AddressOGM, 'HAS_ADDRESS', cardinality=ZeroOrOne)
+    address = RelationshipTo(AddressRelationshipsOGM, 'HAS_ADDRESS', cardinality=ZeroOrOne)
 
 
 # ===== Fixtures =====
@@ -38,8 +37,8 @@ class PersonOGM(StructuredNode):
 @pytest.fixture
 def registered_models():
     """Register models"""
-    Converter.register_models(AddressPydantic, AddressOGM)
-    Converter.register_models(PersonPydantic, PersonOGM)
+    Converter.register_models(AddressPydantic, AddressRelationshipsOGM)
+    Converter.register_models(PersonPydantic, PersonRelationshipsOGM)
     yield
 
 

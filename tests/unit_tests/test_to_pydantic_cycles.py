@@ -1,12 +1,16 @@
 import pytest
 from neomodel import (
-    StructuredNode, StringProperty, IntegerProperty, BooleanProperty,
-    RelationshipTo, ZeroOrOne, One
+    BooleanProperty,
+    IntegerProperty,
+    One,
+    RelationshipTo,
+    StringProperty,
+    StructuredNode,
+    ZeroOrOne,
 )
 from pydantic import BaseModel
 
-from converter import Converter
-
+from pydantic_neo4j_dict import Converter
 
 # ===== Models for cycle detection tests =====
 
@@ -90,7 +94,8 @@ DeepNodePydantic.model_rebuild()
 
 class DeepNodeOGM(StructuredNode):
     name = StringProperty()
-    level = IntegerProperty(required=True)  # Make this required so it gets included in minimal instances
+    # Make `level` required so it gets included in minimal instances
+    level = IntegerProperty(required=True)
 
     # Relationship to next node
     next_node = RelationshipTo('DeepNodeOGM', 'NEXT', cardinality=ZeroOrOne)

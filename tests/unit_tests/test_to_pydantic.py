@@ -1,12 +1,16 @@
 import pytest
 from neomodel import (
-    StructuredNode, StringProperty, IntegerProperty, BooleanProperty,
-    RelationshipTo, ZeroOrOne, One
+    BooleanProperty,
+    IntegerProperty,
+    One,
+    RelationshipTo,
+    StringProperty,
+    StructuredNode,
+    ZeroOrOne,
 )
 from pydantic import BaseModel
 
-from converter import Converter, ConversionError
-
+from pydantic_neo4j_dict import ConversionError, Converter
 
 # ===== Models for cycle detection tests =====
 
@@ -37,9 +41,11 @@ NodeAPydantic.model_rebuild()
 
 class NodeAOGM(StructuredNode):
     name = StringProperty(required=True)
-    uid = StringProperty(unique_index=True)  # Unique index property should be included in minimal instance
+    # Unique index property `uid` - should be included in minimal instance
+    uid = StringProperty(unique_index=True)
     is_active = BooleanProperty(default=True)
-    code = StringProperty(required=True)  # Required property should be included in minimal instance
+    # Required property `code` - should be included in minimal instance
+    code = StringProperty(required=True)
 
     # Relationship to NodeB
     to_b = RelationshipTo('NodeBOGM', 'CONNECTS_TO', cardinality=ZeroOrOne)

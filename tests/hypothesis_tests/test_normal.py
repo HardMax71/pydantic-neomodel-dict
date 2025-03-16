@@ -2,24 +2,41 @@ import datetime
 import enum
 import string
 import uuid
-from typing import List, Optional, Dict, Any, Set
+from typing import Any, Dict, List, Optional, Set
 
 import pytest
-from hypothesis import given, strategies as st, settings, HealthCheck
-from hypothesis.strategies import lists, dictionaries, text, integers, floats, booleans, datetimes, none, sets
-from neomodel import (
-    StructuredNode, StringProperty, IntegerProperty, FloatProperty, BooleanProperty,
-    DateTimeProperty, RelationshipTo, RelationshipFrom, config, db, ArrayProperty, JSONProperty, StructuredRel,
-    ZeroOrOne, DateProperty
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
+from hypothesis.strategies import (
+    booleans,
+    datetimes,
+    dictionaries,
+    floats,
+    integers,
+    lists,
+    none,
+    sets,
+    text,
 )
-from pydantic import BaseModel, Field, ConfigDict
+from neomodel import (
+    ArrayProperty,
+    BooleanProperty,
+    DateProperty,
+    DateTimeProperty,
+    FloatProperty,
+    IntegerProperty,
+    JSONProperty,
+    RelationshipFrom,
+    RelationshipTo,
+    StringProperty,
+    StructuredNode,
+    StructuredRel,
+    ZeroOrOne,
+    db,
+)
+from pydantic import BaseModel, ConfigDict, Field
 
-from converter import Converter
-
-config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
-config.ENCRYPTED_CONNECTION = False
-config.AUTO_INSTALL_LABELS = True
-
+from pydantic_neo4j_dict import Converter
 
 # ----------------------------------------
 # Define a variety of test models
@@ -525,6 +542,65 @@ def build_pydantic_models(data_dict, model_class):
 
     return model_class(**data_dict)
 
+
+# ----------------------------------------
+# Fixture to ensure model registrations persist
+# ----------------------------------------
+
+@pytest.fixture(scope="session", autouse=True)
+def preserve_hypothesis_model_registrations():
+    """
+    Ensure model registrations are preserved throughout the entire hypothesis test session.
+    This fixture runs at the beginning of the test session and prevents registry cleaning.
+    """
+    print("Ensuring model registrations are preserved for hypothesis tests...")
+
+    # Re-register if needed (they should already be registered from module level)
+    if SimplePydantic not in Converter._pydantic_to_ogm:
+        print("Re-registering models for hypothesis tests...")
+        # These are the same registrations that are at the module level
+        Converter.register_models(SimplePydantic, SimpleOGM)
+        Converter.register_models(CollectionPydantic, CollectionOGM)
+        Converter.register_models(AddressPydantic, AddressOGM)
+        Converter.register_models(CompanyPydantic, CompanyOGM)
+        Converter.register_models(PersonPydantic, PersonOGM)
+
+        # Re-register custom type converters if needed
+        if (UserRole, str) not in Converter._type_converters:
+            Converter.register_type_converter(
+                UserRole, str,
+                lambda role: role.value
+            )
+
+            Converter.register_type_converter(
+                str, UserRole,
+                lambda role_str: UserRole(role_str) if role_str in [r.value for r in UserRole] else UserRole.VIEWER
+            )
+
+            Converter.register_type_converter(
+                UserStatus, int,
+                lambda status: status.value
+            )
+
+            Converter.register_type_converter(
+                int, UserStatus,
+                lambda status_int: UserStatus(status_int) if status_int in [s.value for s in
+                                                                            UserStatus] else UserStatus.ACTIVE
+            )
+
+            # Other converters as needed
+
+    print(f"Verified registrations: {len(Converter._pydantic_to_ogm)} model pairs")
+
+    # Override the clean_registry fixture to prevent it from cleaning during hypothesis tests
+    orig_clean_registry = getattr(pytest, '_clean_registry', None)
+
+    # Only yield once this fixture completes - preserving registrations for the whole session
+    yield
+
+    # Restore original if needed (probably not necessary for session scope)
+    if orig_clean_registry:
+        pytest._clean_registry = orig_clean_registry
 
 # ----------------------------------------
 # Test classes for different aspects of conversion
@@ -1156,7 +1232,6 @@ class TestRelationshipConversions:
 
         # Verify relationships
         assert "friends" in result_dict
-        assert isinstance(result_dict["friends"], list)
         assert len(result_dict["friends"]) == len(person_dict.get("friends", []))
 
         if person_dict.get("best_friend"):

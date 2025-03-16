@@ -1,9 +1,8 @@
 import pytest
-from neomodel import StructuredNode, StringProperty, IntegerProperty
+from neomodel import IntegerProperty, StringProperty, StructuredNode
 from pydantic import BaseModel
 
-from converter import Converter
-
+from pydantic_neo4j_dict import Converter
 
 # ===== Module-level model definitions =====
 

@@ -1,11 +1,10 @@
 from typing import Optional
 
 import pytest
-from neomodel import StructuredNode, StringProperty
+from neomodel import StringProperty, StructuredNode
 from pydantic import BaseModel
 
-from converter import Converter
-
+from pydantic_neo4j_dict import Converter
 
 # ===== Module-level model definitions =====
 

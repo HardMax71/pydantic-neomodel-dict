@@ -3,13 +3,18 @@ from typing import List, Optional
 
 import pytest
 from neomodel import (
-    StructuredNode, StringProperty, IntegerProperty, FloatProperty, BooleanProperty, DateProperty,
-    RelationshipTo, ZeroOrOne
+    BooleanProperty,
+    DateProperty,
+    FloatProperty,
+    IntegerProperty,
+    RelationshipTo,
+    StringProperty,
+    StructuredNode,
+    ZeroOrOne,
 )
 from pydantic import BaseModel, Field
 
-from converter import Converter, ConversionError
-
+from pydantic_neo4j_dict import ConversionError, Converter
 
 # ===== Module-level model definitions =====
 

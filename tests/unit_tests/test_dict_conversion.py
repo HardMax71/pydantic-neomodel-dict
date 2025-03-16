@@ -1,51 +1,50 @@
 import pytest
-from neomodel import StructuredNode, StringProperty, IntegerProperty, FloatProperty, BooleanProperty, RelationshipTo
+from neomodel import BooleanProperty, FloatProperty, IntegerProperty, RelationshipTo, StringProperty, StructuredNode
 
-from converter import Converter
-
+from pydantic_neo4j_dict import Converter
 
 # ===== Module-level model definitions =====
 
-class UserOGM_DictTest(StructuredNode):
+class UserDictTestOGM(StructuredNode):
     name = StringProperty(required=True)
     email = StringProperty(unique_index=True)
     age = IntegerProperty(default=25)
 
 
-class ProductOGM_DictTest(StructuredNode):
+class ProductDictTestOGM(StructuredNode):
     name = StringProperty(required=True)
     price = FloatProperty(default=0.0)
     in_stock = BooleanProperty(default=True)
 
 
-class AddressOGM_DictTest(StructuredNode):
+class AddressDictTestOGM(StructuredNode):
     street = StringProperty(required=True)
     city = StringProperty(required=True)
 
 
-class CustomerOGM_DictTest(StructuredNode):
+class CustomerDictTestOGM(StructuredNode):
     name = StringProperty(required=True)
-    addresses = RelationshipTo(AddressOGM_DictTest, 'HAS_ADDRESS')
+    addresses = RelationshipTo(AddressDictTestOGM, 'HAS_ADDRESS')
 
 
-class NodeOGM_DictTest(StructuredNode):
+class NodeDictTestOGM(StructuredNode):
     name = StringProperty(required=True)
-    links_to = RelationshipTo('NodeOGM_DictTest', 'LINKS_TO')
+    links_to = RelationshipTo('NodeDictTestOGM', 'LINKS_TO')
 
 
-class ItemOGM_DictTest(StructuredNode):
+class ItemDictTestOGM(StructuredNode):
     name = StringProperty(required=True)
     quantity = IntegerProperty(default=0)
 
 
-class TagOGM_DictTest(StructuredNode):
+class TagDictTestOGM(StructuredNode):
     name = StringProperty(required=True)
 
 
-class ArticleOGM_DictTest(StructuredNode):
+class ArticleDictTestOGM(StructuredNode):
     title = StringProperty(required=True)
     content = StringProperty()
-    tags = RelationshipTo(TagOGM_DictTest, 'HAS_TAG')
+    tags = RelationshipTo(TagDictTestOGM, 'HAS_TAG')
 
 
 # ===== Fixtures =====
@@ -117,7 +116,7 @@ class TestDictConversion:
         Verifies that direct properties and simple relationships are correctly preserved.
         """
         # Convert to OGM
-        user_ogm = Converter.dict_to_ogm(user_dict, UserOGM_DictTest)
+        user_ogm = Converter.dict_to_ogm(user_dict, UserDictTestOGM)
 
         # Verify properties were preserved
         assert user_ogm.name == "John Doe", "Name not preserved"
@@ -134,7 +133,7 @@ class TestDictConversion:
         Verifies that properties are correctly extracted into a dictionary.
         """
         # Create an OGM instance
-        product = ProductOGM_DictTest(name="Test Product", price=99.99, in_stock=True).save()
+        product = ProductDictTestOGM(name="Test Product", price=99.99, in_stock=True).save()
 
         # Convert to dictionary
         product_dict = Converter.ogm_to_dict(product)
@@ -151,7 +150,7 @@ class TestDictConversion:
         Verifies that relationships are properly established when converting from dictionaries.
         """
         # Convert to OGM
-        customer_ogm = Converter.dict_to_ogm(customer_dict, CustomerOGM_DictTest)
+        customer_ogm = Converter.dict_to_ogm(customer_dict, CustomerDictTestOGM)
 
         # Verify properties
         assert customer_ogm.name == "Customer A", "Name not preserved"
@@ -179,7 +178,7 @@ class TestDictConversion:
         Verifies that circular references are properly handled without causing infinite recursion.
         """
         # Convert to OGM
-        node_a_ogm = Converter.dict_to_ogm(cyclic_dict, NodeOGM_DictTest)
+        node_a_ogm = Converter.dict_to_ogm(cyclic_dict, NodeDictTestOGM)
 
         # Verify properties
         assert node_a_ogm.name == "Node A", "Name not preserved"
@@ -203,13 +202,15 @@ class TestDictConversion:
 
         # Verify the cycle is represented in the dict
         assert result_dict["name"] == "Node A", "Name not in dict"
-        assert len(result_dict["links_to"]) == 1, "Links not in dict"
-        assert result_dict["links_to"][0]["name"] == "Node B", "First link not in dict"
-        assert result_dict["links_to"][0]["links_to"][0]["name"] == "Node C", "Second link not in dict"
+        # links_to must have the only dict - Node B
+        assert isinstance(result_dict["links_to"], dict), "Links not in dict"
+        # A -> B -> Name of node B
+        assert result_dict["links_to"]["name"] == "Node B", "First link not in dict"
+        # A -> B -> C -> Name of node C
+        assert result_dict["links_to"]["links_to"]["name"] == "Node C", "Second link not in dict"
 
         # The cycle should be detected and handled (either by empty dict or by reference to already processed node)
-        assert "links_to" in result_dict["links_to"][0]["links_to"][0], "Cycle detection failed"
-
+        assert "links_to" in result_dict["links_to"]["links_to"], "Cycle detection failed"
 
     def test_batch_dict_conversion(self, db_connection, item_dicts):
         """
@@ -218,7 +219,7 @@ class TestDictConversion:
         Verifies that batch conversion works efficiently for multiple objects.
         """
         # Batch convert to OGM
-        item_ogms = Converter.batch_dict_to_ogm(item_dicts, ItemOGM_DictTest)
+        item_ogms = Converter.batch_dict_to_ogm(item_dicts, ItemDictTestOGM)
 
         # Verify all items were converted
         assert len(item_ogms) == 5, "Not all items were converted"
@@ -247,9 +248,9 @@ class TestDictConversion:
         """
         # Define OGM models
         # Create an article with tags
-        article = ArticleOGM_DictTest(title="Test Article", content="This is a test").save()
-        tag1 = TagOGM_DictTest(name="Python").save()
-        tag2 = TagOGM_DictTest(name="Neo4j").save()
+        article = ArticleDictTestOGM(title="Test Article", content="This is a test").save()
+        tag1 = TagDictTestOGM(name="Python").save()
+        tag2 = TagDictTestOGM(name="Neo4j").save()
 
         article.tags.connect(tag1)
         article.tags.connect(tag2)
@@ -295,7 +296,7 @@ class TestDictConversion:
         root = {"name": "Root Node", "links_to": [level1]}
 
         # Convert with max_depth=2 (should convert root and level1, but not level2's relationships)
-        result = Converter.dict_to_ogm(root, NodeOGM_DictTest, max_depth=2)
+        result = Converter.dict_to_ogm(root, NodeDictTestOGM, max_depth=2)
 
         # Verify the root and level1 were converted
         assert result is not None

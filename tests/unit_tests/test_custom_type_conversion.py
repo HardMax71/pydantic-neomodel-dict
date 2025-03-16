@@ -1,9 +1,8 @@
 import pytest
-from neomodel import StructuredNode, StringProperty, IntegerProperty
+from neomodel import IntegerProperty, StringProperty, StructuredNode
 from pydantic import BaseModel
 
-from converter import Converter
-
+from pydantic_neo4j_dict import Converter
 
 # ===== Module-level model definitions =====
 
@@ -13,7 +12,7 @@ class UserPydantic(BaseModel):
     age: int
 
 
-class UserOGM_CustomType(StructuredNode):
+class UserCustomTypeOGM(StructuredNode):
     name = StringProperty(required=True)
     email = StringProperty(unique_index=True, required=True)
     age = IntegerProperty(index=True, default=0)
@@ -24,7 +23,7 @@ class UserOGM_CustomType(StructuredNode):
 @pytest.fixture
 def registered_models():
     """Register models"""
-    Converter.register_models(UserPydantic, UserOGM_CustomType)
+    Converter.register_models(UserPydantic, UserCustomTypeOGM)
     yield
 
 

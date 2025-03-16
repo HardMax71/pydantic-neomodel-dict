@@ -1,11 +1,17 @@
 import pytest
 from neomodel import (
-    StructuredNode, StringProperty, IntegerProperty,
-    RelationshipTo, RelationshipFrom, ZeroOrOne, One, db
+    IntegerProperty,
+    One,
+    RelationshipFrom,
+    RelationshipTo,
+    StringProperty,
+    StructuredNode,
+    ZeroOrOne,
+    db,
 )
 from pydantic import BaseModel, Field
 
-from converter import Converter, ConversionError
+from pydantic_neo4j_dict import ConversionError, Converter
 
 
 # Define an unregistered OGM model (won't have a Pydantic counterpart)
@@ -24,7 +30,8 @@ class RegisteredOGM(StructuredNode):
     # Different relationship types to unregistered model
     unregistered_many = RelationshipTo('UnregisteredOGM', 'RELATES_TO_MANY')
     unregistered_one = RelationshipTo('UnregisteredOGM', 'RELATES_TO_ONE', cardinality=One)
-    unregistered_zero_or_one = RelationshipTo('UnregisteredOGM', 'RELATES_TO_ZERO_OR_ONE', cardinality=ZeroOrOne)
+    unregistered_zero_or_one = RelationshipTo('UnregisteredOGM',
+                                              'RELATES_TO_ZERO_OR_ONE', cardinality=ZeroOrOne)
 
     # Add a relationship to MiddleOGM to fix the nested test
     middle_relation = RelationshipTo('MiddleOGM', 'REGISTERED_TO_MIDDLE')
@@ -82,7 +89,8 @@ class TestMissingRegistration:
         Converter._ogm_to_pydantic = {}
 
     def test_unregistered_many_relationship_raises_error(self, db_connection):
-        """Test that converting an OGM with many-relationship to unregistered model raises ConversionError"""
+        # Test that converting an OGM with many-relationship to
+        # unregistered model raises ConversionError
         # Create registered node
         reg_node = RegisteredOGM(name="Registered Node", value=10).save()
 
@@ -100,7 +108,8 @@ class TestMissingRegistration:
         assert "No Pydantic model registered for OGM class UnregisteredOGM" in str(excinfo.value)
 
     def test_unregistered_one_relationship_raises_error(self, db_connection):
-        """Test that converting an OGM with One-relationship to unregistered model raises ConversionError"""
+        # Test that converting an OGM with One-relationship
+        # to unregistered model raises ConversionError
         # Create registered node
         reg_node = RegisteredOGM(name="Registered Node", value=10).save()
 
@@ -118,7 +127,8 @@ class TestMissingRegistration:
         assert "No Pydantic model registered for OGM class UnregisteredOGM" in str(excinfo.value)
 
     def test_unregistered_zero_or_one_relationship_raises_error(self, db_connection):
-        """Test that converting an OGM with ZeroOrOne-relationship to unregistered model raises ConversionError"""
+        # Test that converting an OGM with ZeroOrOne-relationship to
+        # unregistered model raises ConversionError
         # Create registered node
         reg_node = RegisteredOGM(name="Registered Node", value=10).save()
 

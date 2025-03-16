@@ -1,8 +1,7 @@
 import pytest
 from pydantic import BaseModel
 
-from converter import Converter, ConversionError
-
+from pydantic_neo4j_dict import ConversionError, Converter
 
 # ===== Module-level model definitions =====
 

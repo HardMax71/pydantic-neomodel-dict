@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pydantic-neo4j-dict"
+version = "0.1.0"
+description = "A bidirectional converter between Pydantic models, Python dictionaries and Neo4j OGM models"
+readme = "README.md"
+authors = [
+    {name = "Max Azatian", email = "max.azatian@gmail.com"}
+]
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Intended Audience :: Developers",
+]
+keywords = ["pydantic", "neo4j", "orm", "converter", "ogm"]
+dependencies = [
+    "pydantic>=2.0.0",
+    "neomodel>=5.0.0",
+]
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "hypothesis>=6.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.9.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/HardMax71/pydantic-neo4j-dict"
+"Bug Tracker" = "https://github.com/HardMax71/pydantic-neo4j-dict/issues"
+"Documentation" = "https://github.com/HardMax71/pydantic-neo4j-dict#readme"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["pydantic_neo4j_dict"]
+
+[tool.setuptools.package-data]
+pydantic_neo4j_dict = ["py.typed"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+lint.select = ["E", "F", "I", "N", "W"]
+lint.ignore = []
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit_tests", "tests/hypothesis_tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+console_output_style = "progress"
+log_cli = true
+log_cli_level = "INFO"
+addopts = "-v"
+markers = { "unit" = "marks tests as unit tests", "hypothesis" = "marks tests that use hypothesis"}
