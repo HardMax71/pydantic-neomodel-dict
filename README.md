@@ -1,11 +1,38 @@
-# Pydantic ↔ Neo4j OGM ↔ Python Dict Converter
+<h1 align="center">Pydantic ↔ Neo4j OGM ↔ Python Dict Converter</h1>
 
-![Tests](https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml/badge.svg)
-[![Ruff](https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml/badge.svg?branch=main&event=push&label=ruff)](https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml)
-[![MyPy](https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml/badge.svg?branch=main&event=push&label=mypy)](https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml)
-[![codecov](https://codecov.io/gh/HardMax71/pydantic-neo4j-dict/branch/main/graph/badge.svg)](https://codecov.io/gh/HardMax71/pydantic-neo4j-dict)
-[![PyPI version](https://badge.fury.io/py/pydantic-neo4j-dict.svg)](https://badge.fury.io/py/pydantic-neo4j-dict)
-[![Python versions](https://img.shields.io/pypi/pyversions/pydantic-neo4j-dict.svg)](https://pypi.org/project/pydantic-neo4j-dict/)
+<p align="center">
+  <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml">
+    <img src="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml/badge.svg?branch=main&event=push&label=ruff" alt="Ruff">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml">
+    <img src="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml/badge.svg?branch=main&event=push&label=mypy" alt="MyPy">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://sonarcloud.io/dashboard?id=HardMax71_pydantic-neo4j-dict">
+    <img src="https://sonarcloud.io/api/project_badges/measure?project=HardMax71_pydantic-neo4j-dict&metric=alert_status" alt="Quality Gate Status">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml">
+    <img src="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml/badge.svg" alt="Tests">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://codecov.io/gh/HardMax71/pydantic-neo4j-dict">
+    <img src="https://codecov.io/gh/HardMax71/pydantic-neo4j-dict/branch/main/graph/badge.svg" alt="Codecov">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://badge.fury.io/py/pydantic-neo4j-dict">
+    <img src="https://badge.fury.io/py/pydantic-neo4j-dict.svg" alt="PyPI version">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://pypi.org/project/pydantic-neo4j-dict/">
+    <img src="https://img.shields.io/pypi/pyversions/pydantic-neo4j-dict.svg" alt="Python versions">
+  </a>
+</p>
 
 A bidirectional converter between Pydantic models, Neo4j OGM (Object Graph Mapper) models, and Python dictionaries. This library simplifies the integration between Pydantic's data validation capabilities and Neo4j's graph database operations.
 
