@@ -684,18 +684,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         }
 
     @classmethod
-    def _empty_for_field(cls, field_type: Optional[type]) -> Any:
-        """Return an empty collection based on the field type or None if not a collection."""
-        if not field_type:
-            return None
-        origin = get_origin(field_type)
-        if any([origin is list, field_type is list]):
-            return []
-        if any([origin is dict, field_type is dict]):
-            return {}
-        return None
-
-    @classmethod
     def ogm_to_dict(
             cls,
             ogm_instance: OGM_Model,
@@ -754,11 +742,8 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                 is_single = hasattr(rel, 'manager') and rel.manager.__name__ in (
                     'ZeroOrOne', 'One', 'AsyncZeroOrOne', 'AsyncOne'
                 )
-                rel_mgr = getattr(ogm_instance, rel_name, None)
-                try:
-                    rel_objs = list(rel_mgr.all()) if rel_mgr is not None else []
-                except Exception:
-                    rel_objs = []
+                rel_mgr: Optional[RelationshipManager] = getattr(ogm_instance, rel_name, None)
+                rel_objs = cls.get_related_ogms(rel_mgr)
 
                 if is_single:
                     result[rel_name] = (cls.ogm_to_dict(
@@ -770,13 +755,10 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                         include_relationships
                     ) if rel_objs else None)
                 else:
-                    if len(rel_objs) == 0:
-                        # Look up the expected field type from the registered Pydantic model.
-                        pyd_cls = cls._ogm_to_pydantic.get(type(ogm_instance))
-                        field_type = get_type_hints(pyd_cls).get(rel_name) if pyd_cls else None
-                        result[rel_name] = cls._empty_for_field(field_type)
-                    elif len(rel_objs) == 1:
-                        single_dict = cls.ogm_to_dict(
+                    # MANY relationship:
+                    if len(rel_objs) <= 1:
+                        # When there are 0 or 1 related objects:
+                        value = None if not rel_objs else cls.ogm_to_dict(
                             rel_objs[0],
                             processed_objects,
                             max_depth - 1,
@@ -786,15 +768,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                         )
                         pyd_cls = cls._ogm_to_pydantic.get(type(ogm_instance))
                         field_type = get_type_hints(pyd_cls).get(rel_name) if pyd_cls else None
-                        # If the expected type is a list (or its origin is list), wrap in a list.
-                        if field_type is not None:
-                            origin = get_origin(field_type)
-                            if origin is list or field_type is list:
-                                result[rel_name] = [single_dict]
-                            else:
-                                result[rel_name] = single_dict
-                        else:
-                            result[rel_name] = single_dict
+                        result[rel_name] = cls.process_field_value(field_type, value)
                     else:
                         converted_list = []
                         for obj in rel_objs:
@@ -812,6 +786,43 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
         current_path.remove(instance_id)
         return result
+
+    @classmethod
+    def process_field_value(cls, field_type: Optional[type], value: Optional[Any]) -> Any:
+        """
+        Process a field value based on the expected type from the Pydantic model.
+
+        If `value` is None, return an empty collection if the expected type is a collection (list/dict),
+        otherwise return None.
+
+        If `value` is not None and the expected type is a list (or its origin is list), wrap the value in a list.
+        Otherwise, return the value as is.
+        """
+        if value is None:
+            if not field_type:
+                return None
+            origin = get_origin(field_type)
+            if origin is list or field_type is list:
+                return []
+            if origin is dict or field_type is dict:
+                return {}
+            return None
+        else:
+            if field_type:
+                origin = get_origin(field_type)
+                if origin is list or field_type is list:
+                    return [value]
+            return value
+
+    @classmethod
+    def get_related_ogms(cls, rel_mgr: Optional[RelationshipManager]) -> List[OGM_Model]:
+        """Tries to return all related objectes to given manager, if any exist. If none - returns []"""
+        try:
+            rel_objs = list(rel_mgr.all()) if rel_mgr is not None else []
+        except CardinalityViolation:
+            # Will be thrown if there's 1-1 connection, but object on either side is missing
+            rel_objs = []
+        return rel_objs
 
     @classmethod
     def batch_dict_to_ogm(

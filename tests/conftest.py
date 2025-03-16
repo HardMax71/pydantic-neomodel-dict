@@ -1,6 +1,8 @@
 import pytest
 from neomodel import config, db
 
+CYPHER_CLEAR_DB_QUERY: str = "MATCH (n) DETACH DELETE n"
+
 
 @pytest.fixture(scope="session", autouse=True)
 def db_connection():
@@ -19,7 +21,7 @@ def db_connection():
     yield
     # Clear database after all tests
     try:
-        db.cypher_query("MATCH (n) DETACH DELETE n")
+        db.cypher_query(CYPHER_CLEAR_DB_QUERY)
     except Exception as e:
         print(f"Warning: Could not clear database: {str(e)}")
 
@@ -28,11 +30,11 @@ def db_connection():
 def clear_database(db_connection):
     """Clear database before and after each test"""
     try:
-        db.cypher_query("MATCH (n) DETACH DELETE n")
+        db.cypher_query(CYPHER_CLEAR_DB_QUERY)
     except Exception as e:
         pytest.fail(f"Failed to clear database: {str(e)}")
     yield
     try:
-        db.cypher_query("MATCH (n) DETACH DELETE n")
+        db.cypher_query(CYPHER_CLEAR_DB_QUERY)
     except Exception as e:
         print(f"Warning: Could not clear database after test: {str(e)}")
