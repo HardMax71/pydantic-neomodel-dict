@@ -36,6 +36,8 @@ from pydantic import BaseModel
 PydanticModel = TypeVar('PydanticModel', bound=BaseModel)
 OGM_Model = TypeVar('OGM_Model', bound=StructuredNode)
 
+# HINT: Presumably, StructuredNode.element_id is str, src: ..\venv\Lib\site-packages\neo4j\graph\__init__.py
+
 # Types for type converters
 S = TypeVar("S")
 T = TypeVar("T")
@@ -355,7 +357,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             List[BaseModel]: A list of converted Pydantic model instances.
         """
         # Use a single processed_objects dictionary for the entire batch
-        processed_objects: Dict[int, BaseModel] = {}
+        processed_objects: Dict[str, BaseModel] = {}
 
         result = []
         for instance in ogm_instances:
@@ -561,7 +563,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             cls,
             ogm_instance: OGM_Model,
             pydantic_class: Optional[Type[BaseModel]] = None,
-            processed_objects: Optional[Dict[int, BaseModel]] = None,
+            processed_objects: Optional[Dict[str, BaseModel]] = None,
             max_depth: int = 10,
             current_path: Optional[Set[str]] = None
     ) -> Optional[BaseModel]:
@@ -588,7 +590,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         current_path = current_path or set()
 
         # Get instance ID for memory-based cycle detection
-        instance_id = ogm_instance.element_id
+        instance_id: str = ogm_instance.element_id
 
         # Return already processed instance if we've seen it before (not in a cycle)
         if instance_id in processed_objects and instance_id not in current_path:
@@ -687,7 +689,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
     def ogm_to_dict(
             cls,
             ogm_instance: OGM_Model,
-            processed_objects: Optional[Dict[int, dict]] = None,
+            processed_objects: Optional[Dict[str, dict]] = None,
             max_depth: int = 10,
             current_path: Optional[Set[str]] = None,
             include_properties: bool = True,
@@ -721,11 +723,11 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         """
         processed_objects = processed_objects or {}
         current_path = current_path or set()
-        instance_id = ogm_instance.element_id
+        instance_id: str = ogm_instance.element_id
 
         if instance_id in current_path:
             return cls._get_ogm_properties_dict(ogm_instance)
-        if instance_id in processed_objects:
+        if instance_id in processed_objects.keys():
             return processed_objects[instance_id]
         if max_depth <= 0:
             result = cls._get_ogm_properties_dict(ogm_instance)
@@ -739,53 +741,65 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         if include_relationships:
             for rel_name, rel in type(ogm_instance).defined_properties(aliases=False, rels=True,
                                                                        properties=False).items():
-                is_single = hasattr(rel, 'manager') and rel.manager.__name__ in (
-                    'ZeroOrOne', 'One', 'AsyncZeroOrOne', 'AsyncOne'
-                )
-                rel_mgr: Optional[RelationshipManager] = getattr(ogm_instance, rel_name, None)
-                rel_objs = cls.get_related_ogms(rel_mgr)
+                result[rel_name] = cls._process_relationship(current_path, include_properties,
+                                                             max_depth, ogm_instance, processed_objects,
+                                                             rel, rel_name)
 
-                if is_single:
-                    result[rel_name] = (cls.ogm_to_dict(
-                        rel_objs[0],
+        current_path.remove(instance_id)
+        return result
+
+    @classmethod
+    def _process_relationship(
+            cls,
+            current_path: Set[str],
+            include_properties: bool,
+            max_depth: int,
+            ogm_instance: OGM_Model,
+            processed_objects: Dict[str, dict],
+            rel: Any,
+            rel_name: str
+    ) -> Any:
+        is_single: bool = hasattr(rel, 'manager') and rel.manager.__name__ in (
+            'ZeroOrOne', 'One', 'AsyncZeroOrOne', 'AsyncOne'
+        )
+        rel_mgr: Optional[RelationshipManager] = getattr(ogm_instance, rel_name, None)
+        rel_objs: List[OGM_Model] = cls.get_related_ogms(rel_mgr)
+        if is_single:
+            return (cls.ogm_to_dict(
+                rel_objs[0],
+                processed_objects,
+                max_depth - 1,
+                current_path.copy(),
+                include_properties,
+                include_relationships=True
+            ) if rel_objs else None)
+        else:
+            if len(rel_objs) <= 1:
+                value: Optional[dict] = None if not rel_objs else cls.ogm_to_dict(
+                    rel_objs[0],
+                    processed_objects,
+                    max_depth - 1,
+                    current_path.copy(),
+                    include_properties,
+                    include_relationships=True
+                )
+                pyd_cls: Optional[Type[BaseModel]] = cls._ogm_to_pydantic.get(type(ogm_instance))
+                field_type: Optional[type] = get_type_hints(pyd_cls).get(rel_name) if pyd_cls else None
+                return cls.process_field_value(field_type, value)
+            else:
+                converted_list: List[dict] = []
+                for obj in rel_objs:
+                    obj_dict = cls.ogm_to_dict(
+                        obj,
                         processed_objects,
                         max_depth - 1,
                         current_path.copy(),
                         include_properties,
-                        include_relationships
-                    ) if rel_objs else None)
-                else:
-                    # MANY relationship:
-                    if len(rel_objs) <= 1:
-                        # When there are 0 or 1 related objects:
-                        value = None if not rel_objs else cls.ogm_to_dict(
-                            rel_objs[0],
-                            processed_objects,
-                            max_depth - 1,
-                            current_path.copy(),
-                            include_properties,
-                            include_relationships
-                        )
-                        pyd_cls = cls._ogm_to_pydantic.get(type(ogm_instance))
-                        field_type = get_type_hints(pyd_cls).get(rel_name) if pyd_cls else None
-                        result[rel_name] = cls.process_field_value(field_type, value)
-                    else:
-                        converted_list = []
-                        for obj in rel_objs:
-                            obj_dict = cls.ogm_to_dict(
-                                obj,
-                                processed_objects,
-                                max_depth - 1,
-                                current_path.copy(),
-                                include_properties,
-                                include_relationships
-                            )
-                            if obj_dict is not None:
-                                converted_list.append(obj_dict)
-                        result[rel_name] = converted_list
-
-        current_path.remove(instance_id)
-        return result
+                        include_relationships=True
+                    )
+                    if obj_dict is not None:
+                        converted_list.append(obj_dict)
+                return converted_list
 
     @classmethod
     def process_field_value(cls, field_type: Optional[type], value: Optional[Any]) -> Any:
@@ -856,7 +870,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         """
         Batch convert a list of OGM model instances to dictionaries.
         """
-        processed_objects: Dict[int, dict] = {}
+        processed_objects: Dict[str, dict] = {}
         result: List[dict] = []
 
         for instance in ogm_instances:
