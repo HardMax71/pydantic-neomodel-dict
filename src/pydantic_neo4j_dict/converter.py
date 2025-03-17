@@ -145,12 +145,18 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Returns:
             None - updates pydantic_data in-place
         """
-        value = getattr(pydantic_instance, field_name)
-        if isinstance(value, BaseModel):
+        sentinel = object()
+        value = getattr(pydantic_instance, field_name, sentinel)
+        if value is sentinel or isinstance(value, BaseModel):
             return
-        if isinstance(value, list) and all(isinstance(x, BaseModel) for x in value):
-            seen = set()
-            value = [x for x in value if not (id(x) in seen or seen.add(id(x)))]
+        if isinstance(value, list) and all(isinstance(item, BaseModel) for item in value):
+            seen_ids = set()
+            processed_list = []
+            for item in value:
+                if id(item) not in seen_ids:
+                    seen_ids.add(id(item))
+                    processed_list.append(item)
+            value = processed_list
         pydantic_data[field_name] = value
 
     @classmethod
