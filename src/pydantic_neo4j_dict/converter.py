@@ -16,6 +16,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
     get_origin,
     get_type_hints,
 )
@@ -191,9 +192,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             logger.info(f"Maximum recursion depth reached for {type(pydantic_instance).__name__}")
             return None
 
-        # Do not decrement max_depth for the root object itself.
-        if processed_objects is None:
-            processed_objects = {}
+        processed_objects = processed_objects or {}
 
         instance_id = id(pydantic_instance)
         if instance_id in processed_objects:
@@ -209,15 +208,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         ogm_instance: OGM_Model = ogm_class()
         processed_objects[instance_id] = ogm_instance
 
-        # Extract Pydantic data.
-        pydantic_data: Dict[str, Any] = {}
-        try:
-            pydantic_data = pydantic_instance.model_dump(exclude_unset=True, exclude_none=True)
-        except ValueError:
-            # Detected circular dependency
-            # Who throws: https://github.com/pydantic/pydantic-core/blob/53bdfa62abefe061575d51cdb9d59b72000295ee/src/serializers/extra.rs#L183-L197
-            for field_name in pydantic_instance.model_fields.keys():
-                cls._process_pydantic_field(pydantic_instance, field_name, pydantic_data)
+        pydantic_data = cls.extract_pydantic_data(pydantic_instance)
 
         cls._set_ogm_attrs_and_save_model(pydantic_data, ogm_instance)
 
@@ -231,7 +222,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                 continue
 
             target_ogm_class = relationships[rel_name].definition['node_class']
-            items = rel_data if isinstance(rel_data, list) else [rel_data]
+            items = cls._normalize_to_list(rel_data)
 
             # Decrement the depth once for all items.
             new_max_depth = max_depth - 1
@@ -249,6 +240,38 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         # Save the complete object after processing relationships.
         ogm_instance.save()
         return ogm_instance
+
+    @classmethod
+    def extract_pydantic_data(cls, pydantic_instance: BaseModel) -> Dict[str, Any]:
+        """
+        Extract data from a Pydantic model instance into a dictionary.
+
+        This method attempts to convert a Pydantic instance to a dictionary using the model's
+        built-in model_dump method. If that fails due to circular references, it falls back to
+        manually processing each field individually.
+
+        Args:
+            pydantic_instance (BaseModel): The Pydantic model instance to extract data from.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing all the extractable data from the Pydantic model.
+
+        Note:
+            When circular references are detected in the Pydantic model, the standard model_dump
+            method raises a ValueError. In that case, this method handles each field separately
+            using the _process_pydantic_field helper method, which properly manages BaseModel
+            instances and lists of BaseModels to avoid circular reference issues.
+        """
+        # Extract Pydantic data.
+        pydantic_data: Dict[str, Any] = {}
+        try:
+            pydantic_data = pydantic_instance.model_dump(exclude_unset=True, exclude_none=True)
+        except ValueError:
+            # Detected circular dependency
+            # Source: https://github.com/pydantic/pydantic-core/blob/53bdfa62abefe061575d51cdb9d59b72000295ee/src/serializers/extra.rs#L183-L197
+            for field_name in pydantic_instance.model_fields.keys():
+                cls._process_pydantic_field(pydantic_instance, field_name, pydantic_data)
+        return pydantic_data
 
     @classmethod
     def _process_related_item(
@@ -443,8 +466,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             target_ogm_class = rel.definition['node_class']
             rel_manager = getattr(ogm_instance, rel_name)
 
-            # Normalize to list if needed
-            items = rel_data if isinstance(rel_data, list) else [rel_data]
+            items = cls._normalize_to_list(rel_data)
 
             new_max_depth = max_depth - 1
             for i, item in enumerate(items):
@@ -459,6 +481,25 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                 related_instance = cls.dict_to_ogm(item, target_ogm_class, processed_objects, new_max_depth)
                 if related_instance:
                     cls._connect_related_instance(rel_manager, related_instance)
+
+    @classmethod
+    def _normalize_to_list(cls, rel_data: Any) -> List[Any]:
+        """
+        Normalize input data to a list format.
+
+        This utility method ensures that relationship data is always in list format
+        for consistent processing, regardless of whether the input is a single item
+        or already a list.
+
+        Args:
+            rel_data (Any): The relationship data to normalize. Can be a single item or a list.
+
+        Returns:
+            List[Any]: A list containing the input data. If the input was already a list,
+                      it is returned unchanged. If it was a single item, it is wrapped in a list.
+        """
+        items = rel_data if isinstance(rel_data, list) else [rel_data]
+        return items
 
     @classmethod
     def _connect_related_instance(cls, rel_manager: RelationshipManager, related_instance: OGM_Model) -> None:
@@ -580,14 +621,62 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Returns:
             Converted Pydantic model instance or None if input is None
         """
+        # Initialize tracking structures
+        processed_objects = processed_objects or {}
+        current_path = current_path or set()
+
+        # Handle depth limit and prepare conversion
+        conversion_data = cls._prepare_pydantic_conversion(
+            ogm_instance, pydantic_class, processed_objects, max_depth, current_path
+        )
+
+        if not isinstance(conversion_data, tuple):
+            # If not a tuple, it's an early return value (None or previously processed instance)
+            return conversion_data
+
+        # Unpack conversion data
+        pydantic_class, instance_id, minimal_instance = conversion_data
+
+        # Add object to current path for cycle detection in nested calls
+        current_path.add(instance_id)
+
+        try:
+            # Process relationships
+            cls._process_pydantic_relationships(
+                ogm_instance, minimal_instance, pydantic_class,
+                processed_objects, max_depth, current_path
+            )
+            return minimal_instance
+        finally:
+            # Always remove object from path when done processing
+            current_path.remove(instance_id)
+
+    @classmethod
+    def _prepare_pydantic_conversion(
+            cls,
+            ogm_instance: OGM_Model,
+            pydantic_class: Optional[Type[BaseModel]],
+            processed_objects: Dict[str, BaseModel],
+            max_depth: int,
+            current_path: Set[str]
+    ) -> Union[Optional[BaseModel], Tuple[Type[BaseModel], str, BaseModel]]:
+        """
+        Prepare for Pydantic conversion by handling common checks and initializations.
+
+        This method handles:
+        - Maximum depth check
+        - Cycle detection
+        - Resolving Pydantic class
+        - Creating the initial Pydantic instance
+
+        Returns:
+            - A BaseModel instance for early returns (None or previously processed)
+            - A tuple of (pydantic_class, instance_id, minimal_instance) for normal processing
+        """
+        # Check for maximum recursion depth
         if max_depth <= 0:
             logger.info(f"Maximum recursion depth reached for {type(ogm_instance).__name__}")
             return None
-
-        # Initialize tracking structures if any is None
-        if processed_objects is None:
-            processed_objects = {}
-        current_path = current_path or set()
 
         # Get instance ID for memory-based cycle detection
         instance_id: str = ogm_instance.element_id
@@ -607,73 +696,164 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         if instance_id in current_path:
             # Create a new stub instance for this cycle instance
             # Important: we DO NOT store this in processed_objects to keep them distinct
-            stub_instance = cls._create_minimal_pydantic_instance(ogm_instance, pydantic_class)
-            return stub_instance
+            return cls._create_minimal_pydantic_instance(ogm_instance, pydantic_class)
 
+        # Get type hints for the Pydantic model
+        pydantic_type_hints = cls._resolve_pydantic_type_hints(pydantic_class)
+
+        # Create Pydantic instance from OGM data
+        minimal_instance = cls._create_pydantic_instance(
+            ogm_instance, pydantic_class, pydantic_type_hints
+        )
+
+        # Register the new instance in processed objects
+        processed_objects[instance_id] = minimal_instance
+
+        # Return data needed for further processing
+        return pydantic_class, instance_id, minimal_instance
+
+    @classmethod
+    def _resolve_pydantic_type_hints(cls, pydantic_class: Type[BaseModel]) -> Dict[str, Any]:
+        """
+        Resolve type hints for a Pydantic model class.
+
+        Creates a local namespace for proper type resolution and returns the type hints.
+
+        Args:
+            pydantic_class: The Pydantic model class
+
+        Returns:
+            Dictionary of field names to their type annotations
+        """
         # Create namespace for type resolution
         # Need this weird magic cause `neomodel` saves all Nodes in sort of global dict for whatever reason
         local_namespace = {cls.__name__: cls for cls in cls._pydantic_to_ogm.keys()}
         local_namespace[pydantic_class.__name__] = pydantic_class
 
         # Get field types from Pydantic model
-        pydantic_type_hints = get_type_hints(pydantic_class, globalns=None, localns=local_namespace)
+        return get_type_hints(pydantic_class, globalns=None, localns=local_namespace)
 
+    @classmethod
+    def _create_pydantic_instance(
+            cls,
+            ogm_instance: OGM_Model,
+            pydantic_class: Type[BaseModel],
+            pydantic_type_hints: Dict[str, Any]
+    ) -> BaseModel:
+        """
+        Create a Pydantic model instance from an OGM instance's property data.
+
+        Args:
+            ogm_instance: Source OGM model instance
+            pydantic_class: Target Pydantic model class
+            pydantic_type_hints: Type hints for the Pydantic model fields
+
+        Returns:
+            A new Pydantic model instance with properties set from the OGM instance
+        """
         # Extract and convert properties
         pydantic_data = cls._get_property_data(ogm_instance, pydantic_type_hints)
 
         # Create instance without validation, compatible with both Pydantic v1 and v2
-        minimal_instance = pydantic_class.model_construct(**pydantic_data)
-        processed_objects[instance_id] = minimal_instance
+        return pydantic_class.model_construct(**pydantic_data)
 
-        # Add object to current path for cycle detection in nested calls
-        current_path.add(instance_id)
+    @classmethod
+    def _process_pydantic_relationships(
+            cls,
+            ogm_instance: OGM_Model,
+            pydantic_instance: BaseModel,
+            pydantic_class: Type[BaseModel],
+            processed_objects: Dict[str, BaseModel],
+            max_depth: int,
+            current_path: Set[str]
+    ) -> None:
+        """
+        Process relationships from OGM to Pydantic model.
 
-        try:
-            # Process relationships
-            ogm_relationships = type(ogm_instance).defined_properties(aliases=False, rels=True, properties=False)
+        Args:
+            ogm_instance: Source OGM model instance
+            pydantic_instance: Target Pydantic model instance to update
+            pydantic_class: The Pydantic model class
+            processed_objects: Dictionary of already processed objects
+            max_depth: Maximum recursion depth
+            current_path: Set of object IDs in the current path
+        """
+        # Get type hints for proper relationship handling
+        pydantic_type_hints = cls._resolve_pydantic_type_hints(pydantic_class)
 
-            # Process relationships with unified approach
-            for rel_name, rel in ogm_relationships.items():
-                # Skip relationships not in Pydantic model
-                if rel_name not in pydantic_type_hints:
-                    continue
+        # Get relationships defined in the OGM model
+        ogm_relationships = type(ogm_instance).defined_properties(
+            aliases=False, rels=True, properties=False
+        )
 
-                # Get target class information
-                target_ogm_class = rel.definition['node_class']
-                target_pydantic_class = cls._ogm_to_pydantic.get(target_ogm_class)
-                if not target_pydantic_class:
-                    raise ConversionError(f"No Pydantic model registered for OGM class {target_ogm_class.__name__}")
+        # Process each relationship
+        for rel_name, rel in ogm_relationships.items():
+            # Skip relationships not in Pydantic model
+            if rel_name not in pydantic_type_hints:
+                continue
 
-                # Determine relationship cardinality
-                field_type = pydantic_type_hints.get(rel_name)
-                is_single = not any([get_origin(field_type) is list, field_type is list])
+            # Process this specific relationship
+            cls._process_single_relationship(
+                ogm_instance, pydantic_instance, rel_name, rel,
+                pydantic_type_hints, processed_objects, max_depth, current_path
+            )
 
-                # Get related objects
-                rel_mgr = getattr(ogm_instance, rel_name)
-                rel_objects = list(rel_mgr.all())
+    @classmethod
+    def _process_single_relationship(
+            cls,
+            ogm_instance: OGM_Model,
+            pydantic_instance: BaseModel,
+            rel_name: str,
+            rel: Any,
+            pydantic_type_hints: Dict[str, Any],
+            processed_objects: Dict[str, BaseModel],
+            max_depth: int,
+            current_path: Set[str]
+    ) -> None:
+        """
+        Process a single relationship from OGM to Pydantic model.
 
-                # Convert related objects
-                converted_objects = [
-                    cls.to_pydantic(
-                        obj,
-                        target_pydantic_class,
-                        processed_objects,
-                        max_depth - 1,
-                        current_path
-                    )
-                    for obj in rel_objects
-                ]
+        Args:
+            ogm_instance: Source OGM model instance
+            pydantic_instance: Target Pydantic model instance to update
+            rel_name: Name of the relationship
+            rel: Relationship definition
+            pydantic_type_hints: Type hints for the Pydantic model fields
+            processed_objects: Dictionary of already processed objects
+            max_depth: Maximum recursion depth
+            current_path: Set of object IDs in the current path
+        """
+        # Get target class information
+        target_ogm_class = rel.definition['node_class']
+        target_pydantic_class = cls._ogm_to_pydantic.get(target_ogm_class)
+        if not target_pydantic_class:
+            raise ConversionError(f"No Pydantic model registered for OGM class {target_ogm_class.__name__}")
 
-                # Set attribute based on cardinality
-                if is_single:
-                    setattr(minimal_instance, rel_name, converted_objects[0] if converted_objects else None)
-                else:
-                    setattr(minimal_instance, rel_name, converted_objects)
+        # Determine relationship cardinality
+        field_type = pydantic_type_hints.get(rel_name)
+        is_single = not any([get_origin(field_type) is list, field_type is list])
 
-            return minimal_instance
-        finally:
-            # Always remove object from path when done processing
-            current_path.remove(instance_id)
+        # Get related objects
+        rel_mgr = getattr(ogm_instance, rel_name)
+        rel_objects = list(rel_mgr.all())
+
+        # Convert related objects
+        converted_objects = [
+            cls.to_pydantic(
+                obj,
+                target_pydantic_class,
+                processed_objects,
+                max_depth - 1,
+                current_path
+            )
+            for obj in rel_objects
+        ]
+
+        # Set attribute based on cardinality
+        if is_single:
+            setattr(pydantic_instance, rel_name, converted_objects[0] if converted_objects else None)
+        else:
+            setattr(pydantic_instance, rel_name, converted_objects)
 
     @classmethod
     def _get_ogm_properties_dict(cls, ogm_instance: OGM_Model) -> dict:
@@ -721,12 +901,8 @@ class Converter(Generic[PydanticModel, OGM_Model]):
               instead of returning None for all non-specified values, algorithm will try to check for hints from
               Pydantic models first and if such are available - return empty collections not as None but as []/{}.
         """
-        if processed_objects is None:
-            processed_objects = {}
-
-        if current_path is None:
-            current_path = set()
-
+        processed_objects = processed_objects or {}
+        current_path = current_path or set()
         instance_id: str = ogm_instance.element_id
 
         if instance_id in current_path:
@@ -837,7 +1013,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
     @classmethod
     def get_related_ogms(cls, rel_mgr: Optional[RelationshipManager]) -> List[OGM_Model]:
-        """Tries to return all related objectes to given manager, if any exist. If none - returns []"""
+        """Tries to return all related objects to given manager, if any exist. If none - returns []"""
         try:
             rel_objs = list(rel_mgr.all()) if rel_mgr is not None else []
         except CardinalityViolation:
