@@ -13,7 +13,6 @@
     <img src="https://sonarcloud.io/api/project_badges/measure?project=HardMax71_pydantic-neomodel-dict&metric=alert_status" alt="Quality Gate Status">
   </a>
 </p>
-
 <p align="center">
   <a href="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/tests.yml">
     <img src="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/tests.yml/badge.svg?branch=main" alt="Tests">
@@ -23,7 +22,6 @@
     <img src="https://codecov.io/gh/HardMax71/pydantic-neomodel-dict/branch/main/graph/badge.svg" alt="Codecov">
   </a>
 </p>
-
 <p align="center">
   <a href="https://badge.fury.io/py/pydantic-neomodel-dict">
     <img src="https://badge.fury.io/py/pydantic-neomodel-dict.svg" alt="PyPI version">
