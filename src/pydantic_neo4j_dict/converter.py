@@ -764,6 +764,8 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         )
         rel_mgr: Optional[RelationshipManager] = getattr(ogm_instance, rel_name, None)
         rel_objs: List[OGM_Model] = cls.get_related_ogms(rel_mgr)
+
+        # Capturing special case for 0/1-1 relationship first
         if is_single:
             return (cls.ogm_to_dict(
                 rel_objs[0],
@@ -773,33 +775,36 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                 include_properties,
                 include_relationships=True
             ) if rel_objs else None)
-        else:
-            if len(rel_objs) <= 1:
-                value: Optional[dict] = None if not rel_objs else cls.ogm_to_dict(
-                    rel_objs[0],
-                    processed_objects,
-                    max_depth - 1,
-                    current_path.copy(),
-                    include_properties,
-                    include_relationships=True
-                )
-                pyd_cls: Optional[Type[BaseModel]] = cls._ogm_to_pydantic.get(type(ogm_instance))
-                field_type: Optional[type] = get_type_hints(pyd_cls).get(rel_name) if pyd_cls else None
-                return cls.process_field_value(field_type, value)
-            else:
-                converted_list: List[dict] = []
-                for obj in rel_objs:
-                    obj_dict = cls.ogm_to_dict(
-                        obj,
-                        processed_objects,
-                        max_depth - 1,
-                        current_path.copy(),
-                        include_properties,
-                        include_relationships=True
-                    )
-                    if obj_dict is not None:
-                        converted_list.append(obj_dict)
-                return converted_list
+
+        # Else - checking for 0/1-* relationships
+        # First - if #(relationships) = 0/1
+        if len(rel_objs) <= 1:
+            value: Optional[dict] = None if not rel_objs else cls.ogm_to_dict(
+                rel_objs[0],
+                processed_objects,
+                max_depth - 1,
+                current_path.copy(),
+                include_properties,
+                include_relationships=True
+            )
+            pyd_cls: Optional[Type[BaseModel]] = cls._ogm_to_pydantic.get(type(ogm_instance))
+            field_type: Optional[type] = get_type_hints(pyd_cls).get(rel_name) if pyd_cls else None
+            return cls.process_field_value(field_type, value)
+
+        # Then - if #(relationships) = any
+        converted_list: List[dict] = []
+        for obj in rel_objs:
+            obj_dict = cls.ogm_to_dict(
+                obj,
+                processed_objects,
+                max_depth - 1,
+                current_path.copy(),
+                include_properties,
+                include_relationships=True
+            )
+            if obj_dict is not None:
+                converted_list.append(obj_dict)
+        return converted_list
 
     @classmethod
     def process_field_value(cls, field_type: Optional[type], value: Optional[Any]) -> Any:
@@ -812,21 +817,19 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         If `value` is not None and the expected type is a list (or its origin is list), wrap the value in a list.
         Otherwise, return the value as is.
         """
-        if value is None:
-            if not field_type:
-                return None
-            origin = get_origin(field_type)
-            if origin is list or field_type is list:
+        origin = get_origin(field_type)
+        is_list_type = origin is list or field_type is list
+        is_dict_type = origin is dict or field_type is dict
+
+        match (is_list_type, is_dict_type, value is None):
+            case (True, _, True):
                 return []
-            if origin is dict or field_type is dict:
+            case (True, _, False):
+                return [value]
+            case (_, True, True):
                 return {}
-            return None
-        else:
-            if field_type:
-                origin = get_origin(field_type)
-                if origin is list or field_type is list:
-                    return [value]
-            return value
+            case _:
+                return value
 
     @classmethod
     def get_related_ogms(cls, rel_mgr: Optional[RelationshipManager]) -> List[OGM_Model]:
