@@ -4,7 +4,8 @@ A bidirectional converter between Pydantic models and Neo4j OGM (Object Graph Ma
 supporting complex relationships, nested models, and custom type conversions.
 """
 
-from .converter import ConversionError, Converter
+from .converter import Converter
+from .errors import ConversionError
 
 __version__ = "0.1.0"
 __all__ = ["Converter", "ConversionError"]

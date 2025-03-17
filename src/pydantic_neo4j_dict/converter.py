@@ -32,6 +32,8 @@ from neomodel import (
 )
 from pydantic import BaseModel
 
+from .errors import ConversionError
+
 # Type variables for generic typing
 PydanticModel = TypeVar('PydanticModel', bound=BaseModel)
 OGM_Model = TypeVar('OGM_Model', bound=StructuredNode)
@@ -44,11 +46,6 @@ T = TypeVar("T")
 
 # Configure logger
 logger = logging.getLogger(__name__)
-
-
-class ConversionError(Exception):
-    """Exception raised for errors during model conversion."""
-    pass
 
 
 class Converter(Generic[PydanticModel, OGM_Model]):
@@ -84,9 +81,9 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Register a custom type converter function.
 
         Args:
-            source_type (Type): The source type to convert from.
-            target_type (Type): The target type to convert to.
-            converter_func (Callable[[Any], Any]): A function that converts a value from source_type to target_type.
+            source_type (Type[S]): The source type to convert from.
+            target_type (Type[T]): The target type to convert to.
+            converter_func (Callable[[S], T]): A function that converts a value from source_type to target_type.
 
         Returns:
             None.
@@ -95,21 +92,18 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         logger.debug(f"Registered type converter: {source_type.__name__} -> {target_type.__name__}")
 
     @classmethod
-    def _convert_value(cls, value: Any, target_type: Type[T]) -> Any:
+    def _convert_value(cls, value: Optional[S], target_type: Type[T]) -> Any:
         """
         Convert the given value to the specified target type using registered converters if available.
 
         Args:
-            value (Any): The value to convert.
+            value (S): The value to convert.
             target_type (Type[T]): The target type to which the value should be converted.
 
         Returns:
             Any: The converted value.
         """
-        if value is None:
-            return None
-
-        source_type = type(value)
+        source_type: type[S] | type[None] = type(value)
 
         # Check for direct registered converter
         # Useful for objects/nested structures with objects
@@ -121,7 +115,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         return value
 
     @classmethod
-    def register_models(cls, pydantic_class: Type[BaseModel], ogm_class: Type[StructuredNode]) -> None:
+    def register_models(cls, pydantic_class: Type[PydanticModel], ogm_class: Type[OGM_Model]) -> None:
         """
         Register a mapping between a Pydantic model class and a neomodel OGM model class.
 
@@ -151,18 +145,12 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Returns:
             None - updates pydantic_data in-place
         """
-        sentinel = object()
-        value = getattr(pydantic_instance, field_name, sentinel)
-        if value is sentinel or isinstance(value, BaseModel):
+        value = getattr(pydantic_instance, field_name)
+        if isinstance(value, BaseModel):
             return
-        if isinstance(value, list) and all(isinstance(item, BaseModel) for item in value):
-            seen_ids = set()
-            processed_list = []
-            for item in value:
-                if id(item) not in seen_ids:
-                    seen_ids.add(id(item))
-                    processed_list.append(item)
-            value = processed_list
+        if isinstance(value, list) and all(isinstance(x, BaseModel) for x in value):
+            seen = set()
+            value = [x for x in value if not (id(x) in seen or seen.add(id(x)))]
         pydantic_data[field_name] = value
 
     @classmethod
@@ -223,8 +211,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             target_ogm_class = relationships[rel_name].definition['node_class']
             items = cls._normalize_to_list(rel_data)
 
-            # Decrement the depth once for all items.
-            new_max_depth = max_depth - 1
             for item in items:
                 cls._process_related_item(
                     item,
@@ -232,11 +218,10 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                     rel_name,
                     target_ogm_class,
                     processed_objects,
-                    new_max_depth,
+                    max_depth - 1,
                     id(pydantic_instance)
                 )
 
-        # Save the complete object after processing relationships.
         ogm_instance.save()
         return ogm_instance
 
