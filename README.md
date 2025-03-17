@@ -1,4 +1,4 @@
-<h1 align="center">Pydantic ↔ Neo4j OGM ↔ Python Dict Converter</h1>
+<h1 align="center">Pydantic ↔ Neomodel (Neo4j) OGM ↔ Python Dict Converter</h1>
 
 <p align="center">
   <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/ruff.yml">
@@ -34,13 +34,13 @@
   </a>
 </p>
 
-A bidirectional converter between Pydantic models, Neo4j OGM (Object Graph Mapper) models, and Python dictionaries. This
+A bidirectional converter between Pydantic models, Neomodel (Neo4j) OGM (Object Graph Mapper) models, and Python dictionaries. This
 library simplifies the integration between Pydantic's data validation capabilities and Neo4j's graph database
 operations.
 
 ## Features
 
-- **Bidirectional Conversion**: Convert seamlessly between Pydantic models, Neo4j OGM models, and Python dictionaries
+- **Bidirectional Conversion**: Convert seamlessly between Pydantic models, Neomodel (Neo4j) OGM models, and Python dictionaries
 - **Relationship Handling**: Process complex relationships at any level of nesting
 - **Circular Reference Support**: Detect and properly handle circular references in object graphs
 - **Custom Type Conversion**: Register custom type converters for specialized data transformations
@@ -61,7 +61,7 @@ pip install pydantic-neo4j-dict
 
 ## Basic Usage
 
-Here's a simple example demonstrating conversion between Pydantic and Neo4j OGM models:
+Here's a simple example demonstrating conversion between Pydantic and Neomodel (Neo4j) OGM models:
 
 > [!NOTE]  
 > Before execution of example down here, use
@@ -73,7 +73,7 @@ from pydantic import BaseModel
 from neomodel import StructuredNode, StringProperty, IntegerProperty, config
 from pydantic_neo4j_dict import Converter
 
-# Set up Neo4j connection - this is required!
+# Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
 config.ENCRYPTED_CONNECTION = False
 config.AUTO_INSTALL_LABELS = True
@@ -125,14 +125,14 @@ Dictionary conversion result: {'name': 'John Doe', 'email': 'john@example.com', 
 <details>
 <summary>Simple Model Conversion</summary>
 
-This example demonstrates basic conversion between Pydantic models and Neo4j OGM models:
+This example demonstrates basic conversion between Pydantic models and Neomodel (Neo4j) OGM models:
 
 ```python
 from pydantic import BaseModel
 from neomodel import StructuredNode, StringProperty, IntegerProperty, UniqueIdProperty, config
 from pydantic_neo4j_dict import Converter
 
-# Set up Neo4j connection - this is required!
+# Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
 config.ENCRYPTED_CONNECTION = False
 config.AUTO_INSTALL_LABELS = True
@@ -146,7 +146,7 @@ class ProductPydantic(BaseModel):
     sku: str
 
 
-# Define Neo4j OGM model
+# Define Neomodel (Neo4j) OGM model
 class ProductOGM(StructuredNode):
     uid = UniqueIdProperty()
     name = StringProperty(required=True)
@@ -165,7 +165,7 @@ product = ProductPydantic(
     sku="WH-X1000"
 )
 
-# Convert to Neo4j OGM model
+# Convert to Neomodel (Neo4j) OGM model
 product_ogm = Converter.to_ogm(product)
 
 # Save to database
@@ -202,7 +202,7 @@ from pydantic import BaseModel
 
 from pydantic_neo4j_dict import Converter
 
-# Set up Neo4j connection - this is required!
+# Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
 config.ENCRYPTED_CONNECTION = False
 config.AUTO_INSTALL_LABELS = True
@@ -227,7 +227,7 @@ class CustomerPydantic(BaseModel):
     orders: List[OrderPydantic] = []
 
 
-# Define Neo4j OGM models
+# Define Neomodel (Neo4j) OGM models
 class AddressOGM(StructuredNode):
     street = StringProperty(required=True)
     city = StringProperty(required=True)
@@ -268,7 +268,7 @@ customer = CustomerPydantic(
     ]
 )
 
-# Convert to Neo4j OGM model (this will create all related nodes)
+# Convert to Neomodel (Neo4j) OGM model (this will create all related nodes)
 customer_ogm = Converter.to_ogm(customer)
 
 # Retrieve and convert back
@@ -309,7 +309,7 @@ from pydantic import BaseModel
 
 from pydantic_neo4j_dict import Converter
 
-# Set up Neo4j connection - this is required!
+# Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
 config.ENCRYPTED_CONNECTION = False
 config.AUTO_INSTALL_LABELS = True
@@ -325,7 +325,7 @@ class PersonPydantic(BaseModel):
 PersonPydantic.model_rebuild()
 
 
-# Define Neo4j OGM models
+# Define Neomodel (Neo4j) OGM models
 class PersonOGM(StructuredNode):
     name = StringProperty(required=True, unique_index=True)
     friends = RelationshipTo('PersonOGM', 'FRIENDS_WITH')
@@ -344,7 +344,7 @@ alice.friends = [bob, charlie]
 bob.friends = [alice, charlie]
 charlie.friends = [alice, bob]
 
-# Convert to Neo4j OGM models (handles circular references)
+# Convert to Neomodel (Neo4j) OGM models (handles circular references)
 alice_ogm = Converter.to_ogm(alice)
 
 # Convert back to Pydantic
@@ -381,7 +381,7 @@ from pydantic import BaseModel
 
 from pydantic_neo4j_dict import Converter
 
-# Set up Neo4j connection - this is required!
+# Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
 config.ENCRYPTED_CONNECTION = False
 config.AUTO_INSTALL_LABELS = True
@@ -395,7 +395,7 @@ class EventPydantic(BaseModel):
 
 class EventOGM(StructuredNode):
     title = StringProperty(required=True)
-    event_date = DateProperty(required=True)  # Neo4j uses date
+    event_date = DateProperty(required=True)  # Neomodel (Neo4j) uses date
 
 
 # Register custom type converters
@@ -418,7 +418,7 @@ event = EventPydantic(
     event_date=datetime(2023, 10, 15, 9, 0, 0)
 )
 
-# Convert to Neo4j OGM (datetime will be converted to date)
+# Convert to Neomodel (Neo4j) OGM (datetime will be converted to date)
 event_ogm = Converter.to_ogm(event)
 
 # Convert back to Pydantic (date will be converted to datetime)
@@ -453,7 +453,7 @@ from pydantic import BaseModel
 
 from pydantic_neo4j_dict import Converter
 
-# Set up Neo4j connection - this is required!
+# Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
 config.ENCRYPTED_CONNECTION = False
 config.AUTO_INSTALL_LABELS = True
@@ -521,13 +521,13 @@ from neomodel import StructuredNode, StringProperty, IntegerProperty, config, Re
 
 from pydantic_neo4j_dict import Converter
 
-# Set up Neo4j connection - this is required!
+# Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
 config.ENCRYPTED_CONNECTION = False
 config.AUTO_INSTALL_LABELS = True
 
 
-# Define Neo4j OGM models
+# Define Neomodel (Neo4j) OGM models
 class AddressOGM(StructuredNode):
     street = StringProperty(required=True)
     city = StringProperty(required=True)
@@ -598,8 +598,8 @@ Address: 456 Oak Avenue, San Francisco
 
 ## Limitations
 
-- **Default Neo4j Connection**: This library uses the default `db` connection from `neomodel`, so creating OGM models
-  not in global scope may lead to errors. Always ensure your Neo4j connection is properly configured before using the
+- **Default Neomodel (Neo4j) Connection**: This library uses the default `db` connection from `neomodel`, so creating OGM models
+  not in global scope may lead to errors. Always ensure your Neomodel (Neo4j) connection is properly configured before using the
   converter.
 - **Depth Limit**: Conversion has a default depth limit of 10 to prevent excessive recursion in complex object graphs.
 - **Transaction Management**: The converter handles transactions internally but doesn't provide explicit transaction
