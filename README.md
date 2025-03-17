@@ -1,36 +1,36 @@
 <h1 align="center">Pydantic ↔ Neomodel (Neo4j) OGM ↔ Python Dict Converter</h1>
 
 <p align="center">
-  <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/ruff.yml">
-    <img src="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/ruff.yml/badge.svg?branch=main" alt="Ruff">
+  <a href="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/ruff.yml">
+    <img src="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/ruff.yml/badge.svg?branch=main" alt="Ruff">
   </a>
   &nbsp;
-  <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/mypy.yml">
-    <img src="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/mypy.yml/badge.svg?branch=main" alt="MyPy">
+  <a href="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/mypy.yml">
+    <img src="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/mypy.yml/badge.svg?branch=main" alt="MyPy">
   </a>
   &nbsp;
-  <a href="https://sonarcloud.io/dashboard?id=HardMax71_pydantic-neo4j-dict">
-    <img src="https://sonarcloud.io/api/project_badges/measure?project=HardMax71_pydantic-neo4j-dict&metric=alert_status" alt="Quality Gate Status">
+  <a href="https://sonarcloud.io/dashboard?id=HardMax71_pydantic-neomodel-dict">
+    <img src="https://sonarcloud.io/api/project_badges/measure?project=HardMax71_pydantic-neomodel-dict&metric=alert_status" alt="Quality Gate Status">
   </a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/tests.yml">
-    <img src="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/tests.yml/badge.svg?branch=main" alt="Tests">
+  <a href="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/tests.yml">
+    <img src="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/tests.yml/badge.svg?branch=main" alt="Tests">
   </a>
 &nbsp;
-  <a href="https://codecov.io/gh/HardMax71/pydantic-neo4j-dict">
-    <img src="https://codecov.io/gh/HardMax71/pydantic-neo4j-dict/branch/main/graph/badge.svg" alt="Codecov">
+  <a href="https://codecov.io/gh/HardMax71/pydantic-neomodel-dict">
+    <img src="https://codecov.io/gh/HardMax71/pydantic-neomodel-dict/branch/main/graph/badge.svg" alt="Codecov">
   </a>
 </p>
 
 <p align="center">
-  <a href="https://badge.fury.io/py/pydantic-neo4j-dict">
-    <img src="https://badge.fury.io/py/pydantic-neo4j-dict.svg" alt="PyPI version">
+  <a href="https://badge.fury.io/py/pydantic-neomodel-dict">
+    <img src="https://badge.fury.io/py/pydantic-neomodel-dict.svg" alt="PyPI version">
   </a>
   &nbsp;
-  <a href="https://pypi.org/project/pydantic-neo4j-dict/">
-    <img src="https://img.shields.io/pypi/pyversions/pydantic-neo4j-dict.svg" alt="Python versions">
+  <a href="https://pypi.org/project/pydantic-neomodel-dict/">
+    <img src="https://img.shields.io/pypi/pyversions/pydantic-neomodel-dict.svg" alt="Python versions">
   </a>
 </p>
 
@@ -50,7 +50,7 @@ operations.
 ## Installation
 
 ```bash
-pip install pydantic-neo4j-dict
+pip install pydantic-neomodel-dict
 ```
 
 ## Requirements
@@ -65,13 +65,13 @@ Here's a simple example demonstrating conversion between Pydantic and Neomodel (
 
 > [!NOTE]  
 > Before execution of example down here, use
-> supplied [docker-compose.yml](https://github.com/HardMax71/pydantic-neo4j-dict/blob/main/docker-compose.yml)
+> supplied [docker-compose.yml](https://github.com/HardMax71/pydantic-neomodel-dict/blob/main/docker-compose.yml)
 > and start `neo4j` container inside via `docker-compose up --build`.
 
 ```python
 from pydantic import BaseModel
 from neomodel import StructuredNode, StringProperty, IntegerProperty, config
-from pydantic_neo4j_dict import Converter
+from pydantic_neomodel_dict import Converter
 
 # Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
@@ -81,15 +81,15 @@ config.AUTO_INSTALL_LABELS = True
 
 # Define your models
 class UserPydantic(BaseModel):
-    name: str
-    email: str
-    age: int
+  name: str
+  email: str
+  age: int
 
 
 class UserOGM(StructuredNode):
-    name = StringProperty(required=True)
-    email = StringProperty(unique_index=True, required=True)
-    age = IntegerProperty(index=True, default=0)
+  name = StringProperty(required=True)
+  email = StringProperty(unique_index=True, required=True)
+  age = IntegerProperty(index=True, default=0)
 
 
 # Register the model mapping
@@ -130,7 +130,7 @@ This example demonstrates basic conversion between Pydantic models and Neomodel 
 ```python
 from pydantic import BaseModel
 from neomodel import StructuredNode, StringProperty, IntegerProperty, UniqueIdProperty, config
-from pydantic_neo4j_dict import Converter
+from pydantic_neomodel_dict import Converter
 
 # Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
@@ -140,18 +140,18 @@ config.AUTO_INSTALL_LABELS = True
 
 # Define Pydantic model
 class ProductPydantic(BaseModel):
-    uid: str
-    name: str
-    price: float
-    sku: str
+  uid: str
+  name: str
+  price: float
+  sku: str
 
 
 # Define Neomodel (Neo4j) OGM model
 class ProductOGM(StructuredNode):
-    uid = UniqueIdProperty()
-    name = StringProperty(required=True)
-    price = IntegerProperty(required=True)
-    sku = StringProperty(unique_index=True, required=True)
+  uid = UniqueIdProperty()
+  name = StringProperty(required=True)
+  price = IntegerProperty(required=True)
+  sku = StringProperty(unique_index=True, required=True)
 
 
 # Register the models
@@ -159,10 +159,10 @@ Converter.register_models(ProductPydantic, ProductOGM)
 
 # Create a Pydantic instance
 product = ProductPydantic(
-    uid="123e4567-e89b-12d3-a456-426614174000",
-    name="Wireless Headphones",
-    price=99.99,
-    sku="WH-X1000"
+  uid="123e4567-e89b-12d3-a456-426614174000",
+  name="Wireless Headphones",
+  price=99.99,
+  sku="WH-X1000"
 )
 
 # Convert to Neomodel (Neo4j) OGM model
@@ -200,7 +200,7 @@ from typing import List
 from neomodel import IntegerProperty, One, RelationshipFrom, RelationshipTo, StringProperty, StructuredNode, config
 from pydantic import BaseModel
 
-from pydantic_neo4j_dict import Converter
+from pydantic_neomodel_dict import Converter
 
 # Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
@@ -210,41 +210,41 @@ config.AUTO_INSTALL_LABELS = True
 
 # Define Pydantic models
 class AddressPydantic(BaseModel):
-    street: str
-    city: str
-    zip_code: str
+  street: str
+  city: str
+  zip_code: str
 
 
 class OrderPydantic(BaseModel):
-    order_id: str
-    amount: float
+  order_id: str
+  amount: float
 
 
 class CustomerPydantic(BaseModel):
-    name: str
-    email: str
-    address: AddressPydantic
-    orders: List[OrderPydantic] = []
+  name: str
+  email: str
+  address: AddressPydantic
+  orders: List[OrderPydantic] = []
 
 
 # Define Neomodel (Neo4j) OGM models
 class AddressOGM(StructuredNode):
-    street = StringProperty(required=True)
-    city = StringProperty(required=True)
-    zip_code = StringProperty(required=True)
+  street = StringProperty(required=True)
+  city = StringProperty(required=True)
+  zip_code = StringProperty(required=True)
 
 
 class OrderOGM(StructuredNode):
-    order_id = StringProperty(unique_index=True, required=True)
-    amount = IntegerProperty(required=True)
-    customer = RelationshipFrom('CustomerOGM', 'PLACED')
+  order_id = StringProperty(unique_index=True, required=True)
+  amount = IntegerProperty(required=True)
+  customer = RelationshipFrom('CustomerOGM', 'PLACED')
 
 
 class CustomerOGM(StructuredNode):
-    name = StringProperty(required=True)
-    email = StringProperty(unique_index=True, required=True)
-    address = RelationshipTo(AddressOGM, 'HAS_ADDRESS', One)
-    orders = RelationshipTo(OrderOGM, 'PLACED')
+  name = StringProperty(required=True)
+  email = StringProperty(unique_index=True, required=True)
+  address = RelationshipTo(AddressOGM, 'HAS_ADDRESS', One)
+  orders = RelationshipTo(OrderOGM, 'PLACED')
 
 
 # Register model mappings
@@ -255,17 +255,17 @@ Converter.register_models(CustomerPydantic, CustomerOGM)
 # Create a customer with address and orders
 email = f"jane{random.randint(1, 1000)}@example.com"
 customer = CustomerPydantic(
-    name="Jane Smith",
-    email=email,
-    address=AddressPydantic(
-        street="123 Main St",
-        city="New York",
-        zip_code="10001"
-    ),
-    orders=[
-        OrderPydantic(order_id="ORD-001", amount=125.50),
-        OrderPydantic(order_id="ORD-002", amount=75.25)
-    ]
+  name="Jane Smith",
+  email=email,
+  address=AddressPydantic(
+    street="123 Main St",
+    city="New York",
+    zip_code="10001"
+  ),
+  orders=[
+    OrderPydantic(order_id="ORD-001", amount=125.50),
+    OrderPydantic(order_id="ORD-002", amount=75.25)
+  ]
 )
 
 # Convert to Neomodel (Neo4j) OGM model (this will create all related nodes)
@@ -303,11 +303,11 @@ This example demonstrates how the converter handles circular references in objec
 from typing import List
 
 from neomodel import (
-    StructuredNode, StringProperty, RelationshipTo, config
+  StructuredNode, StringProperty, RelationshipTo, config
 )
 from pydantic import BaseModel
 
-from pydantic_neo4j_dict import Converter
+from pydantic_neomodel_dict import Converter
 
 # Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
@@ -317,8 +317,8 @@ config.AUTO_INSTALL_LABELS = True
 
 # Define Pydantic models with circular references
 class PersonPydantic(BaseModel):
-    name: str
-    friends: List['PersonPydantic'] = []
+  name: str
+  friends: List['PersonPydantic'] = []
 
 
 # Add self-reference resolution
@@ -327,8 +327,8 @@ PersonPydantic.model_rebuild()
 
 # Define Neomodel (Neo4j) OGM models
 class PersonOGM(StructuredNode):
-    name = StringProperty(required=True, unique_index=True)
-    friends = RelationshipTo('PersonOGM', 'FRIENDS_WITH')
+  name = StringProperty(required=True, unique_index=True)
+  friends = RelationshipTo('PersonOGM', 'FRIENDS_WITH')
 
 
 # Register models
@@ -372,14 +372,14 @@ This example shows how to use custom type converters for specialized data transf
 from datetime import datetime, date
 
 from neomodel import (
-    StructuredNode, StringProperty, DateProperty
+  StructuredNode, StringProperty, DateProperty
 )
 from neomodel import (
-    config
+  config
 )
 from pydantic import BaseModel
 
-from pydantic_neo4j_dict import Converter
+from pydantic_neomodel_dict import Converter
 
 # Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
@@ -389,24 +389,24 @@ config.AUTO_INSTALL_LABELS = True
 
 # Define models
 class EventPydantic(BaseModel):
-    title: str
-    event_date: datetime  # Using Python datetime
+  title: str
+  event_date: datetime  # Using Python datetime
 
 
 class EventOGM(StructuredNode):
-    title = StringProperty(required=True)
-    event_date = DateProperty(required=True)  # Neomodel (Neo4j) uses date
+  title = StringProperty(required=True)
+  event_date = DateProperty(required=True)  # Neomodel (Neo4j) uses date
 
 
 # Register custom type converters
 Converter.register_type_converter(
-    datetime, date,  # Convert from datetime to date
-    lambda dt: dt.date()  # Conversion function
+  datetime, date,  # Convert from datetime to date
+  lambda dt: dt.date()  # Conversion function
 )
 
 Converter.register_type_converter(
-    date, datetime,  # Convert from date to datetime
-    lambda d: datetime.combine(d, datetime.min.time())  # Conversion function
+  date, datetime,  # Convert from date to datetime
+  lambda d: datetime.combine(d, datetime.min.time())  # Conversion function
 )
 
 # Register models
@@ -414,8 +414,8 @@ Converter.register_models(EventPydantic, EventOGM)
 
 # Create a Pydantic instance with datetime
 event = EventPydantic(
-    title="Conference",
-    event_date=datetime(2023, 10, 15, 9, 0, 0)
+  title="Conference",
+  event_date=datetime(2023, 10, 15, 9, 0, 0)
 )
 
 # Convert to Neomodel (Neo4j) OGM (datetime will be converted to date)
@@ -451,7 +451,7 @@ This example demonstrates batch conversion of multiple objects:
 from neomodel import StructuredNode, StringProperty, IntegerProperty, config
 from pydantic import BaseModel
 
-from pydantic_neo4j_dict import Converter
+from pydantic_neomodel_dict import Converter
 
 # Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
@@ -461,17 +461,17 @@ config.AUTO_INSTALL_LABELS = True
 
 # Define models
 class ProductPydantic(BaseModel):
-    name: str
-    sku: str
-    price: float
-    inventory: int
+  name: str
+  sku: str
+  price: float
+  inventory: int
 
 
 class ProductOGM(StructuredNode):
-    name = StringProperty(required=True)
-    sku = StringProperty(unique_index=True, required=True)
-    price = IntegerProperty(required=True)
-    inventory = IntegerProperty(default=0)
+  name = StringProperty(required=True)
+  sku = StringProperty(unique_index=True, required=True)
+  price = IntegerProperty(required=True)
+  inventory = IntegerProperty(default=0)
 
 
 # Register models
@@ -479,11 +479,11 @@ Converter.register_models(ProductPydantic, ProductOGM)
 
 # Create multiple Pydantic instances
 products = [
-    ProductPydantic(name="Laptop", sku="LT-001", price=1299.99, inventory=10),
-    ProductPydantic(name="Smartphone", sku="SP-002", price=899.99, inventory=15),
-    ProductPydantic(name="Headphones", sku="HP-003", price=199.99, inventory=25),
-    ProductPydantic(name="Tablet", sku="TB-004", price=499.99, inventory=8),
-    ProductPydantic(name="Smartwatch", sku="SW-005", price=299.99, inventory=12)
+  ProductPydantic(name="Laptop", sku="LT-001", price=1299.99, inventory=10),
+  ProductPydantic(name="Smartphone", sku="SP-002", price=899.99, inventory=15),
+  ProductPydantic(name="Headphones", sku="HP-003", price=199.99, inventory=25),
+  ProductPydantic(name="Tablet", sku="TB-004", price=499.99, inventory=8),
+  ProductPydantic(name="Smartwatch", sku="SW-005", price=299.99, inventory=12)
 ]
 
 # Batch convert to OGM models (all in a single transaction)
@@ -495,7 +495,7 @@ print(f"Converted {len(product_ogms)} products to OGM models")
 products_pydantic = Converter.batch_to_pydantic(product_ogms)
 
 for product in products_pydantic:
-    print(product.model_dump())
+  print(product.model_dump())
 ```
 
 Output:
@@ -519,7 +519,7 @@ This example shows conversions between dictionaries and OGM models:
 ```python
 from neomodel import StructuredNode, StringProperty, IntegerProperty, config, RelationshipTo
 
-from pydantic_neo4j_dict import Converter
+from pydantic_neomodel_dict import Converter
 
 # Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
@@ -529,26 +529,26 @@ config.AUTO_INSTALL_LABELS = True
 
 # Define Neomodel (Neo4j) OGM models
 class AddressOGM(StructuredNode):
-    street = StringProperty(required=True)
-    city = StringProperty(required=True)
-    zip_code = StringProperty(required=True)
+  street = StringProperty(required=True)
+  city = StringProperty(required=True)
+  zip_code = StringProperty(required=True)
 
 
 class PersonOGM(StructuredNode):
-    name = StringProperty(required=True)
-    age = IntegerProperty(required=True)
-    address = RelationshipTo(AddressOGM, 'LIVES_AT')
+  name = StringProperty(required=True)
+  age = IntegerProperty(required=True)
+  address = RelationshipTo(AddressOGM, 'LIVES_AT')
 
 
 # Dictionary data with nested relationship
 person_dict = {
-    "name": "Alex Johnson",
-    "age": 32,
-    "address": {
-        "street": "456 Oak Avenue",
-        "city": "San Francisco",
-        "zip_code": "94102"
-    }
+  "name": "Alex Johnson",
+  "age": 32,
+  "address": {
+    "street": "456 Oak Avenue",
+    "city": "San Francisco",
+    "zip_code": "94102"
+  }
 }
 
 # Convert dictionary to OGM model
@@ -622,4 +622,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see
-the [LICENSE](https://github.com/HardMax71/pydantic-neo4j-dict/blob/main/LICENSE) file for details.
+the [LICENSE](https://github.com/HardMax71/pydantic-neomodel-dict/blob/main/LICENSE) file for details.

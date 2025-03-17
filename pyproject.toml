@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pydantic-neo4j-dict"
+name = "pydantic-neomodel-dict"
 version = "0.1.0"
-description = "A bidirectional converter between Pydantic models, Python dictionaries and Neo4j OGM models"
+description = "A bidirectional converter between Pydantic models, Python dictionaries and Neomodel (Neo4j) OGM models"
 readme = "README.md"
 authors = [
     {name = "Max Azatian", email = "max.azatian@gmail.com"}
@@ -21,7 +21,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Intended Audience :: Developers",
 ]
-keywords = ["pydantic", "neo4j", "orm", "converter", "ogm"]
+keywords = ["pydantic", "neomodel", "neo4j", "orm", "converter", "ogm"]
 dependencies = [
     "pydantic>=2.0.0",
     "neomodel>=5.0.0",
@@ -38,16 +38,16 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/HardMax71/pydantic-neo4j-dict"
-"Bug Tracker" = "https://github.com/HardMax71/pydantic-neo4j-dict/issues"
-"Documentation" = "https://github.com/HardMax71/pydantic-neo4j-dict#readme"
+"Homepage" = "https://github.com/HardMax71/pydantic-neomodel-dict"
+"Bug Tracker" = "https://github.com/HardMax71/pydantic-neomodel-dict/issues"
+"Documentation" = "https://github.com/HardMax71/pydantic-neomodel-dict#readme"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["pydantic_neo4j_dict"]
+packages = ["pydantic_neomodel_dict"]
 
 [tool.setuptools.package-data]
-pydantic_neo4j_dict = ["py.typed"]
+pydantic_neomodel_dict = ["py.typed"]
 
 [tool.ruff]
 line-length = 120

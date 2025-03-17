@@ -1,6 +1,6 @@
 import pytest
 
-from pydantic_neo4j_dict import Converter
+from pydantic_neomodel_dict import Converter
 
 
 @pytest.fixture(autouse=True)

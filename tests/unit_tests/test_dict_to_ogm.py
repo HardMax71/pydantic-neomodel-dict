@@ -14,7 +14,7 @@ from neomodel import (
 )
 from pydantic import BaseModel, Field
 
-from pydantic_neo4j_dict import ConversionError, Converter
+from pydantic_neomodel_dict import ConversionError, Converter
 
 
 # Define test OGM models with unique names to avoid conflicts

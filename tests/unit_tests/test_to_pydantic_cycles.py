@@ -10,7 +10,7 @@ from neomodel import (
 )
 from pydantic import BaseModel
 
-from pydantic_neo4j_dict import Converter
+from pydantic_neomodel_dict import Converter
 
 # ===== Models for cycle detection tests =====
 

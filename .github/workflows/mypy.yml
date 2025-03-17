@@ -22,4 +22,4 @@ jobs:
           pip install -e .
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Type check with MyPy
-        run: mypy --ignore-missing-imports src/pydantic_neo4j_dict
+        run: mypy --ignore-missing-imports src/pydantic_neomodel_dict

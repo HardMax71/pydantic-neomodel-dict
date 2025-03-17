@@ -36,7 +36,7 @@ from neomodel import (
 )
 from pydantic import BaseModel, ConfigDict, Field
 
-from pydantic_neo4j_dict import Converter
+from pydantic_neomodel_dict import Converter
 
 # ----------------------------------------
 # Define a variety of test models

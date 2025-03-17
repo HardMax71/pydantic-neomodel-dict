@@ -37,7 +37,7 @@ jobs:
       - name: Run unit tests
         run: pytest -xvs tests/unit_tests/
       - name: Generate coverage report for unit tests
-        run: pytest --cov=pydantic_neo4j_dict --cov-report=xml tests/unit_tests/
+        run: pytest --cov=pydantic_neomodel_dict --cov-report=xml tests/unit_tests/
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
@@ -75,7 +75,7 @@ jobs:
       - name: Run hypothesis tests
         run: pytest -xvs tests/hypothesis_tests/
       - name: Generate coverage report for hypothesis tests
-        run: pytest --cov=pydantic_neo4j_dict --cov-report=xml tests/hypothesis_tests/
+        run: pytest --cov=pydantic_neomodel_dict --cov-report=xml tests/hypothesis_tests/
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
