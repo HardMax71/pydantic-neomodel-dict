@@ -721,8 +721,12 @@ class Converter(Generic[PydanticModel, OGM_Model]):
               instead of returning None for all non-specified values, algorithm will try to check for hints from
               Pydantic models first and if such are available - return empty collections not as None but as []/{}.
         """
-        processed_objects = processed_objects or {}
-        current_path = current_path or set()
+        if processed_objects is None:
+            processed_objects = {}
+
+        if current_path is None:
+            current_path = set()
+
         instance_id: str = ogm_instance.element_id
 
         if instance_id in current_path:
