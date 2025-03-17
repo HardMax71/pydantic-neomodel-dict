@@ -16,7 +16,6 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
-    Union,
     get_origin,
     get_type_hints,
 )
@@ -621,13 +620,18 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         Returns:
             Converted Pydantic model instance or None if input is None
         """
+        # Check for maximum recursion depth
+        if max_depth <= 0:
+            logger.info(f"Maximum recursion depth reached for {type(ogm_instance).__name__}")
+            return None
+
         # Initialize tracking structures
         processed_objects = processed_objects or {}
         current_path = current_path or set()
 
         # Handle depth limit and prepare conversion
         conversion_data = cls._prepare_pydantic_conversion(
-            ogm_instance, pydantic_class, processed_objects, max_depth, current_path
+            ogm_instance, pydantic_class, processed_objects, current_path
         )
 
         if not isinstance(conversion_data, tuple):
@@ -657,9 +661,8 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             ogm_instance: OGM_Model,
             pydantic_class: Optional[Type[BaseModel]],
             processed_objects: Dict[str, BaseModel],
-            max_depth: int,
             current_path: Set[str]
-    ) -> Union[Optional[BaseModel], Tuple[Type[BaseModel], str, BaseModel]]:
+    ) -> Optional[BaseModel] | Tuple[Type[BaseModel], str, BaseModel]:
         """
         Prepare for Pydantic conversion by handling common checks and initializations.
 
@@ -673,11 +676,6 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             - A BaseModel instance for early returns (None or previously processed)
             - A tuple of (pydantic_class, instance_id, minimal_instance) for normal processing
         """
-        # Check for maximum recursion depth
-        if max_depth <= 0:
-            logger.info(f"Maximum recursion depth reached for {type(ogm_instance).__name__}")
-            return None
-
         # Get instance ID for memory-based cycle detection
         instance_id: str = ogm_instance.element_id
 

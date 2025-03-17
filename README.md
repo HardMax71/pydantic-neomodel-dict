@@ -1,24 +1,24 @@
 <h1 align="center">Pydantic ↔ Neo4j OGM ↔ Python Dict Converter</h1>
 
 <p align="center">
-  <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml">
-    <img src="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml/badge.svg?branch=main&event=push&label=ruff" alt="Ruff">
+  <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/ruff.yml">
+    <img src="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/ruff.yml/badge.svg?branch=main" alt="Ruff">
   </a>
-  &nbsp;&nbsp;
-  <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml">
-    <img src="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml/badge.svg?branch=main&event=push&label=mypy" alt="MyPy">
+  &nbsp;
+  <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/mypy.yml">
+    <img src="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/mypy.yml/badge.svg?branch=main" alt="MyPy">
   </a>
-  &nbsp;&nbsp;
+  &nbsp;
   <a href="https://sonarcloud.io/dashboard?id=HardMax71_pydantic-neo4j-dict">
     <img src="https://sonarcloud.io/api/project_badges/measure?project=HardMax71_pydantic-neo4j-dict&metric=alert_status" alt="Quality Gate Status">
   </a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml">
-    <img src="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/python-tests.yml/badge.svg" alt="Tests">
+  <a href="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/tests.yml">
+    <img src="https://github.com/HardMax71/pydantic-neo4j-dict/actions/workflows/tests.yml/badge.svg?branch=main" alt="Tests">
   </a>
-  &nbsp;&nbsp;
+&nbsp;
   <a href="https://codecov.io/gh/HardMax71/pydantic-neo4j-dict">
     <img src="https://codecov.io/gh/HardMax71/pydantic-neo4j-dict/branch/main/graph/badge.svg" alt="Codecov">
   </a>
@@ -28,13 +28,15 @@
   <a href="https://badge.fury.io/py/pydantic-neo4j-dict">
     <img src="https://badge.fury.io/py/pydantic-neo4j-dict.svg" alt="PyPI version">
   </a>
-  &nbsp;&nbsp;
+  &nbsp;
   <a href="https://pypi.org/project/pydantic-neo4j-dict/">
     <img src="https://img.shields.io/pypi/pyversions/pydantic-neo4j-dict.svg" alt="Python versions">
   </a>
 </p>
 
-A bidirectional converter between Pydantic models, Neo4j OGM (Object Graph Mapper) models, and Python dictionaries. This library simplifies the integration between Pydantic's data validation capabilities and Neo4j's graph database operations.
+A bidirectional converter between Pydantic models, Neo4j OGM (Object Graph Mapper) models, and Python dictionaries. This
+library simplifies the integration between Pydantic's data validation capabilities and Neo4j's graph database
+operations.
 
 ## Features
 
@@ -62,7 +64,8 @@ pip install pydantic-neo4j-dict
 Here's a simple example demonstrating conversion between Pydantic and Neo4j OGM models:
 
 > [!NOTE]  
-> Before execution of example down here, use supplied [docker-compose.yml](https://github.com/HardMax71/pydantic-neo4j-dict/blob/main/docker-compose.yml)
+> Before execution of example down here, use
+> supplied [docker-compose.yml](https://github.com/HardMax71/pydantic-neo4j-dict/blob/main/docker-compose.yml)
 > and start `neo4j` container inside via `docker-compose up --build`.
 
 ```python
@@ -75,16 +78,19 @@ config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
 config.ENCRYPTED_CONNECTION = False
 config.AUTO_INSTALL_LABELS = True
 
+
 # Define your models
 class UserPydantic(BaseModel):
     name: str
     email: str
     age: int
 
+
 class UserOGM(StructuredNode):
     name = StringProperty(required=True)
     email = StringProperty(unique_index=True, required=True)
     age = IntegerProperty(index=True, default=0)
+
 
 # Register the model mapping
 Converter.register_models(UserPydantic, UserOGM)
@@ -131,6 +137,7 @@ config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
 config.ENCRYPTED_CONNECTION = False
 config.AUTO_INSTALL_LABELS = True
 
+
 # Define Pydantic model
 class ProductPydantic(BaseModel):
     uid: str
@@ -138,12 +145,14 @@ class ProductPydantic(BaseModel):
     price: float
     sku: str
 
+
 # Define Neo4j OGM model
 class ProductOGM(StructuredNode):
     uid = UniqueIdProperty()
     name = StringProperty(required=True)
     price = IntegerProperty(required=True)
     sku = StringProperty(unique_index=True, required=True)
+
 
 # Register the models
 Converter.register_models(ProductPydantic, ProductOGM)
@@ -273,6 +282,7 @@ print("Whole dict: \n", customer_pydantic.model_dump())
 ```
 
 Output:
+
 ```
 Customer: Jane Smith
 Address: 123 Main St, New York
@@ -345,6 +355,7 @@ print(f"{alice_pydantic.friends[0].name}'s friends: {[friend.name for friend in 
 ```
 
 Output:
+
 ``` 
 Alice's friends: ['Charlie', 'Bob']
 Charlie's friends: ['Bob', 'Alice']
@@ -420,6 +431,7 @@ print("Whole object:\n", event_pydantic.model_dump())
 ```
 
 Output:
+
 ``` 
 Event: Conference
 Date: 2023-10-15 09:00:00
@@ -487,6 +499,7 @@ for product in products_pydantic:
 ```
 
 Output:
+
 ``` 
 Converted 5 products to OGM models
 {'name': 'Laptop', 'sku': 'LT-001', 'price': 1299.99, 'inventory': 10}
@@ -551,6 +564,7 @@ print(f"Address: {person_dict_again['address']['street']}, {person_dict_again['a
 ```
 
 Output:
+
 ``` 
 {'name': 'Alex Johnson', 'age': 32, 'address': {'street': '456 Oak Avenue', 'city': 'San Francisco', 'zip_code': '94102'}}
 {'name': 'Alex Johnson', 'age': 32, 'address': {'street': '456 Oak Avenue', 'city': 'San Francisco', 'zip_code': '94102'}}
@@ -573,7 +587,8 @@ Address: 456 Oak Avenue, San Francisco
 ### Batch Operations
 
 - `Converter.batch_to_ogm(pydantic_instances, ogm_class=None, max_depth=10)`: Convert multiple Pydantic instances to OGM
-- `Converter.batch_to_pydantic(ogm_instances, pydantic_class=None, max_depth=10)`: Convert multiple OGM instances to Pydantic
+- `Converter.batch_to_pydantic(ogm_instances, pydantic_class=None, max_depth=10)`: Convert multiple OGM instances to
+  Pydantic
 - `Converter.batch_dict_to_ogm(data_dicts, ogm_class, max_depth=10)`: Convert multiple dictionaries to OGM instances
 - `Converter.batch_ogm_to_dict(ogm_instances, max_depth=10)`: Convert multiple OGM instances to dictionaries
 
@@ -583,12 +598,16 @@ Address: 456 Oak Avenue, San Francisco
 
 ## Limitations
 
-- **Default Neo4j Connection**: This library uses the default `db` connection from `neomodel`, so creating OGM models not in global scope may lead to errors. Always ensure your Neo4j connection is properly configured before using the converter.
+- **Default Neo4j Connection**: This library uses the default `db` connection from `neomodel`, so creating OGM models
+  not in global scope may lead to errors. Always ensure your Neo4j connection is properly configured before using the
+  converter.
 - **Depth Limit**: Conversion has a default depth limit of 10 to prevent excessive recursion in complex object graphs.
-- **Transaction Management**: The converter handles transactions internally but doesn't provide explicit transaction control features.
+- **Transaction Management**: The converter handles transactions internally but doesn't provide explicit transaction
+  control features.
 - **Performance**: Converting very large object graphs may impact performance, especially with deep nesting levels.
 - **Pydantic Versions**: Currently supports Pydantic 2.0.0+; compatibility with older versions is not guaranteed.
-- **Node Identity**: The converter uses object identity for cycle detection, which may not work correctly in all edge cases.
+- **Node Identity**: The converter uses object identity for cycle detection, which may not work correctly in all edge
+  cases.
 
 ## Contributing
 
@@ -602,4 +621,5 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/HardMax71/pydantic-neo4j-dict/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License - see
+the [LICENSE](https://github.com/HardMax71/pydantic-neo4j-dict/blob/main/LICENSE) file for details.

@@ -1,0 +1,58 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python for unit tests
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov hypothesis neomodel pydantic
+          pip install -e .
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Run unit tests
+        run: pytest -xvs tests/unit_tests/
+      - name: Generate coverage report for unit tests
+        run: pytest --cov=pydantic_neo4j_dict --cov-report=xml tests/unit_tests/
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  hypothesis-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python for hypothesis tests
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov hypothesis neomodel pydantic
+          pip install -e .
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Run hypothesis tests
+        run: pytest -xvs tests/hypothesis_tests/
+      - name: Generate coverage report for hypothesis tests
+        run: pytest --cov=pydantic_neo4j_dict --cov-report=xml tests/hypothesis_tests/
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          fail_ci_if_error: false
