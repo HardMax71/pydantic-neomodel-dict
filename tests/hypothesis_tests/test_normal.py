@@ -1,6 +1,7 @@
 import datetime
 import enum
 import string
+import time
 import uuid
 from typing import Any, Dict, List, Optional, Set
 
@@ -279,10 +280,19 @@ Converter.register_type_converter(
 # ----------------------------------------
 
 @st.composite
+def generate_unique_random_uid(draw):
+    # Generating random for sure uid; smh using `st.uuids()` or plain `random` returns
+    # not every time unique values => patch
+    uuid = draw(st.uuids())
+    current_time_ns = time.time_ns()
+    return str(uuid) + str(current_time_ns)
+
+
+@st.composite
 def simple_model_dicts(draw):
     """Strategy to generate simple model dictionaries"""
     return {
-        "uid": draw(text(min_size=1, max_size=36, alphabet=string.ascii_letters + string.digits + "-")),
+        "uid": draw(generate_unique_random_uid()),
         "name": draw(text(min_size=1, max_size=50)),
         "age": draw(integers(min_value=0, max_value=120)),
         "height": draw(st.one_of(floats(min_value=0.1, max_value=3.0), none())),
@@ -301,7 +311,7 @@ def simple_model_dicts(draw):
 def collection_model_dicts(draw):
     """Strategy to generate collection model dictionaries"""
     return {
-        "uid": draw(text(min_size=3, max_size=36, alphabet=string.ascii_letters + string.digits + "-")),
+        "uid": draw(generate_unique_random_uid()),
         "tags": draw(lists(text(min_size=1, max_size=10), max_size=5)),
         "scores": draw(dictionaries(
             keys=text(min_size=1, max_size=10),
@@ -341,7 +351,7 @@ def address_dicts(draw):
 def company_dicts(draw):
     """Strategy to generate company dictionaries"""
     return {
-        "uid": draw(text(min_size=1, max_size=36, alphabet=string.ascii_letters + string.digits + "-")),
+        "uid": draw(generate_unique_random_uid()),
         "name": draw(text(min_size=1, max_size=100)),
         "industry": draw(text(min_size=1, max_size=50)),
         "founded_year": draw(integers(min_value=1800, max_value=2023)),
@@ -364,9 +374,9 @@ def person_dicts(draw, with_nested=True, with_friends=False, with_company=True, 
     simple_text = text(min_size=1, max_size=20, alphabet=string.ascii_letters + string.digits + ".-_")
 
     result = {
-        "uid": draw(text(min_size=10, max_size=20, alphabet=string.ascii_letters + string.digits + "-")),
+        "uid": draw(generate_unique_random_uid()),
         "name": draw(simple_text),
-        "email": draw(simple_text.map(lambda s: f"{s}@example.com")),
+        "email": f"{draw(simple_text)}-{draw(generate_unique_random_uid())}@example.com",
         "age": draw(integers(min_value=18, max_value=80)),  # Narrower range
         "role": draw(st.sampled_from(list(UserRole))),
         "status": draw(st.sampled_from(list(UserStatus))),
@@ -430,9 +440,9 @@ def person_dicts(draw, with_nested=True, with_friends=False, with_company=True, 
         for _ in range(num_friends):
             # Generate simpler friend objects with minimal properties
             friend = {
-                "uid": draw(text(min_size=10, max_size=20, alphabet=string.ascii_letters + string.digits)),
+                "uid": draw(generate_unique_random_uid()),
                 "name": draw(simple_text),
-                "email": draw(simple_text.map(lambda s: f"{s}@example.com")),
+                "email": f"{draw(simple_text)}-{draw(generate_unique_random_uid())}@example.com",
                 "age": draw(integers(min_value=18, max_value=80)),
                 "role": draw(st.sampled_from(list(UserRole))),
                 "status": draw(st.sampled_from(list(UserStatus))),
@@ -460,9 +470,9 @@ def person_dicts(draw, with_nested=True, with_friends=False, with_company=True, 
         # Maybe add manager - with minimal properties
         if draw(booleans()):
             result["manager"] = {
-                "uid": draw(text(min_size=10, max_size=20, alphabet=string.ascii_letters + string.digits)),
+                "uid": draw(generate_unique_random_uid()),
                 "name": draw(simple_text),
-                "email": draw(simple_text.map(lambda s: f"{s}@example.com")),
+                "email": f"{draw(simple_text)}-{draw(generate_unique_random_uid())}@example.com",
                 "age": draw(integers(min_value=18, max_value=80)),
                 "role": draw(st.sampled_from(list(UserRole))),
                 "status": draw(st.sampled_from(list(UserStatus))),
@@ -487,9 +497,9 @@ def person_dicts(draw, with_nested=True, with_friends=False, with_company=True, 
                 num_reports = min(draw(integers(min_value=0, max_value=2)), 1)  # At most 1 report to reduce complexity
                 for i in range(num_reports):
                     report = {
-                        "uid": draw(text(min_size=10, max_size=20, alphabet=string.ascii_letters + string.digits)),
+                        "uid": draw(generate_unique_random_uid()),
                         "name": draw(simple_text),
-                        "email": draw(simple_text.map(lambda s: f"{s}@example.com")),
+                        "email": f"{draw(simple_text)}-{draw(generate_unique_random_uid())}@example.com",
                         "age": draw(integers(min_value=18, max_value=80)),
                         "role": draw(st.sampled_from(list(UserRole))),
                         "status": draw(st.sampled_from(list(UserStatus))),
@@ -601,6 +611,7 @@ def preserve_hypothesis_model_registrations():
     # Restore original if needed (probably not necessary for session scope)
     if orig_clean_registry:
         pytest._clean_registry = orig_clean_registry
+
 
 # ----------------------------------------
 # Test classes for different aspects of conversion
@@ -1644,6 +1655,8 @@ class TestMixedConversions:
         assert manager_dict["email"] == manager.email
         # Check direct_reports in manager_dict if present
         if "direct_reports" in manager_dict:
+            print(f"what want\t\t{manager_dict["direct_reports"]}")
+            print(f"what got:\t\t{manager.direct_reports}")
             assert len(manager_dict["direct_reports"]) == len(manager.direct_reports)
 
         # OGM company to Pydantic
@@ -1666,10 +1679,11 @@ class TestMixedConversions:
             assert report_dict["manager"]["uid"] == manager.uid
 
         # Create new manager model via dict conversion
+        new_manager_uid = data.draw(generate_unique_random_uid())
         new_manager_dict = {
-            "uid": "new-manager",
+            "uid": new_manager_uid,
             "name": "New Manager",
-            "email": "newmanager@example.com",
+            "email": f"newmanager-{new_manager_uid}@example.com",
             "age": 45
         }
 
@@ -1695,7 +1709,7 @@ class TestMixedConversions:
         final_manager = Converter.to_pydantic(new_ogm_manager)
 
         # Verify new structure
-        assert final_manager.uid == "new-manager"
+        assert final_manager.uid == new_manager_uid
         assert len(final_manager.direct_reports) == len(report_nodes)
 
         # Check that each employee now points to the new manager

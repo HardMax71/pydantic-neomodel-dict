@@ -128,6 +128,11 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         logger.debug(f"Registered mapping: {pydantic_class.__name__} <-> {ogm_class.__name__}")
 
     @classmethod
+    def stable_hash(cls, obj: Any) -> int:
+        # TODO: find out better hash(), this one works but disgusting
+        return hash(str(obj))
+
+    @classmethod
     def _process_pydantic_field(cls, pydantic_instance: BaseModel, field_name: str,
                                 pydantic_data: Dict[str, Any]) -> None:
         """
@@ -153,11 +158,62 @@ class Converter(Generic[PydanticModel, OGM_Model]):
             seen_ids = set()
             processed_list = []
             for item in value:
-                if id(item) not in seen_ids:
-                    seen_ids.add(id(item))
+                if cls.stable_hash(item) not in seen_ids:
+                    seen_ids.add(cls.stable_hash(item))
                     processed_list.append(item)
             value = processed_list
         pydantic_data[field_name] = value
+
+    @classmethod
+    def _get_or_create_ogm_instance(cls, data: dict, ogm_class: Type[OGM_Model]) -> OGM_Model:
+        """
+        Get an existing OGM instance or create a new one based on provided data.
+
+        This method uses a hierarchical approach to find existing nodes:
+        1. First try matching on unique indexed properties
+        2. Then try matching on required properties
+        3. Finally, use all non-None properties
+
+        Args:
+            data: Dictionary containing property values
+            ogm_class: The OGM model class to use
+
+        Returns:
+            An existing (updated) or new OGM instance
+        """
+        defined = ogm_class.defined_properties(rels=False, aliases=False)
+
+        # First try to match using unique indexed properties
+        unique_filter = {
+            k: data[k] for k in data
+            if k in defined and data[k] is not None and getattr(defined[k], 'unique_index', False)
+        }
+
+        # If no unique properties available, try required properties
+        required_filter = {} if unique_filter else {
+            k: data[k] for k in data
+            if k in defined and data[k] is not None and getattr(defined[k], 'required', False)
+        }
+
+        # If no unique or required properties, use all non-None properties
+        all_props_filter = {} if (unique_filter or required_filter) else {
+            k: data[k] for k in data if k in defined and data[k] is not None
+        }
+
+        # Use the most specific filter available
+        filter_data = unique_filter or required_filter or all_props_filter
+
+        # Try to find an existing node
+        existing: List[OGM_Model] = ogm_class.nodes.filter(**filter_data) if filter_data else []
+        if existing:
+            instance: OGM_Model = existing[0]
+            logger.info(f"Using existing {ogm_class.__name__} node with properties: {filter_data}")
+        else:
+            instance = ogm_class()
+            logger.info(f"Created new {ogm_class.__name__} node with properties: {filter_data}")
+
+            cls._set_ogm_attrs_and_save_model(data, instance)
+        return instance
 
     @classmethod
     def to_ogm(
@@ -187,7 +243,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
         processed_objects = processed_objects or {}
 
-        instance_id = id(pydantic_instance)
+        instance_id = cls.stable_hash(pydantic_instance)
         if instance_id in processed_objects:
             return processed_objects[instance_id]
 
@@ -202,8 +258,8 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         processed_objects[instance_id] = ogm_instance
 
         pydantic_data = cls.extract_pydantic_data(pydantic_instance)
-
-        cls._set_ogm_attrs_and_save_model(pydantic_data, ogm_instance)
+        ogm_instance = cls._get_or_create_ogm_instance(pydantic_data, ogm_class)
+        processed_objects[instance_id] = ogm_instance
 
         # Process relationships if we have depth remaining.
         relationships = ogm_class.defined_properties(aliases=False, rels=True, properties=False)
@@ -225,7 +281,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
                     target_ogm_class,
                     processed_objects,
                     max_depth - 1,
-                    id(pydantic_instance)
+                    cls.stable_hash(pydantic_instance)
                 )
 
         ogm_instance.save()
@@ -255,7 +311,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         # Extract Pydantic data.
         pydantic_data: Dict[str, Any] = {}
         try:
-            pydantic_data = pydantic_instance.model_dump(exclude_unset=True, exclude_none=True)
+            pydantic_data = pydantic_instance.model_dump(exclude_unset=True)
         except ValueError:
             # Detected circular dependency
             # Source: https://github.com/pydantic/pydantic-core/blob/53bdfa62abefe061575d51cdb9d59b72000295ee/src/serializers/extra.rs#L183-L197
@@ -291,7 +347,7 @@ class Converter(Generic[PydanticModel, OGM_Model]):
         """
         rel_manager = getattr(ogm_instance, rel_name)
         # Handle self–references: if the item is the same as the parent, simply connect.
-        if id(item) == instance_id:
+        if cls.stable_hash(item) == instance_id:
             rel_manager.connect(ogm_instance)
             return True
 
@@ -542,16 +598,14 @@ class Converter(Generic[PydanticModel, OGM_Model]):
 
         processed_objects = processed_objects or {}
 
-        # Use id(data_dict) for cycle detection
-        instance_id = id(data_dict)
+        # Use cls.stable_hash(data_dict) for cycle detection
+        instance_id = cls.stable_hash(data_dict)
         if instance_id in processed_objects:
             return processed_objects[instance_id]
 
-        # Create a new OGM instance and register it
-        ogm_instance: OGM_Model = ogm_class()
+        # Get/create OGM instance that will be used
+        ogm_instance = cls._get_or_create_ogm_instance(data_dict, ogm_class)
         processed_objects[instance_id] = ogm_instance
-
-        cls._set_ogm_attrs_and_save_model(data_dict, ogm_instance)
 
         # Process relationships
         ogm_relationships = ogm_class.defined_properties(aliases=False, rels=True, properties=False)
