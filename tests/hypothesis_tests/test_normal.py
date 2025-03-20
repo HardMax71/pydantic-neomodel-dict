@@ -1655,8 +1655,6 @@ class TestMixedConversions:
         assert manager_dict["email"] == manager.email
         # Check direct_reports in manager_dict if present
         if "direct_reports" in manager_dict:
-            print(f"what want\t\t{manager_dict["direct_reports"]}")
-            print(f"what got:\t\t{manager.direct_reports}")
             assert len(manager_dict["direct_reports"]) == len(manager.direct_reports)
 
         # OGM company to Pydantic
