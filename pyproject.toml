@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydantic-neomodel-dict"
-version = "0.2.0"
+version = "0.3.0"
 description = "A bidirectional converter between Pydantic models, Python dictionaries and Neomodel (Neo4j) OGM models"
 readme = "README.md"
 authors = [
