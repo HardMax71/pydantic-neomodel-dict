@@ -1,0 +1,39 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: ruff check .
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
+      - id: mypy
+        name: mypy
+        entry: mypy --ignore-missing-imports src/pydantic_neomodel_dict
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
+      - id: pytest-unit
+        name: pytest unit tests
+        entry: pytest -xvs tests/unit_tests/
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
+      - id: pytest-unit-cov
+        name: pytest unit tests (coverage)
+        entry: pytest --cov=pydantic_neomodel_dict --cov-report=xml tests/unit_tests/
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
+      - id: pytest-hypothesis
+        name: pytest hypothesis tests
+        entry: pytest -xvs tests/hypothesis_tests/
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
+      - id: pytest-hypothesis-cov
+        name: pytest hypothesis tests (coverage)
+        entry: pytest --cov=pydantic_neomodel_dict --cov-report=xml tests/hypothesis_tests/
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, pre-push]

@@ -10,7 +10,9 @@ from neomodel import (
 )
 from pydantic import BaseModel
 
-from pydantic_neomodel_dict import Converter
+from pydantic_neomodel_dict.converters import SyncConverter
+
+Converter = SyncConverter()
 
 # ===== Models for cycle detection tests =====
 

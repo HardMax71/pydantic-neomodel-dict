@@ -1,7 +1,9 @@
 from neomodel import IntegerProperty, One, RelationshipFrom, RelationshipTo, StringProperty, StructuredNode, db
 from pydantic import BaseModel
 
-from pydantic_neomodel_dict import Converter
+from pydantic_neomodel_dict.converters import SyncConverter
+
+Converter = SyncConverter()
 
 
 # Define OGM models

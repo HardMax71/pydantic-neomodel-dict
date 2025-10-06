@@ -1,13 +1,14 @@
-"""Hook system for lifecycle events."""
-
 import logging
 from threading import RLock
-from typing import Callable, List
+from typing import Callable, List, Union
+
+from neomodel import StructuredNode
+from neomodel.async_.core import AsyncStructuredNode
 
 logger = logging.getLogger(__name__)
 
 
-NodeT = object  # Simplified - in reality this would be StructuredNode | AsyncStructuredNode
+NodeT = Union[StructuredNode, AsyncStructuredNode]
 
 
 class HookManager:

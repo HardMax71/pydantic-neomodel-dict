@@ -14,7 +14,10 @@ from neomodel import (
 )
 from pydantic import BaseModel, Field
 
-from pydantic_neomodel_dict import ConversionError, Converter
+from pydantic_neomodel_dict import ConversionError
+from pydantic_neomodel_dict.converters import SyncConverter
+
+Converter = SyncConverter()
 
 
 # Define test OGM models with unique names to avoid conflicts
@@ -433,5 +436,3 @@ class TestEdgeCaseRelationshipValues:
 
         # The manager should be the same node (self-reference)
         assert managers[0].element_id == result.element_id
-
-

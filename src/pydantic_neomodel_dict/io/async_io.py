@@ -1,4 +1,3 @@
-import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -7,10 +6,8 @@ from neomodel.async_.core import AsyncStructuredNode, adb
 from neomodel.async_.relationship_manager import AsyncRelationshipManager
 from neomodel.exceptions import CardinalityViolation
 
-from ._common import build_merge_query, get_relationship_type, should_use_reconnect
 from ..core.hooks import get_hooks
-
-logger = logging.getLogger(__name__)
+from ._common import build_merge_query, get_relationship_type, should_use_reconnect
 
 
 async def save_node(node: AsyncStructuredNode) -> None:
@@ -49,12 +46,6 @@ async def get_all_related(rel_manager: AsyncRelationshipManager) -> list[AsyncSt
         return nodes
     except CardinalityViolation:
         return []
-
-
-async def filter_nodes(ogm_class: type[AsyncStructuredNode], **filters: Any) -> list[AsyncStructuredNode]:
-    nodes: list[AsyncStructuredNode] = await ogm_class.nodes.filter(**filters).all()
-    return nodes
-
 
 async def merge_node_on_unique(
         ogm_class: type[AsyncStructuredNode],

@@ -1,3 +1,4 @@
+import copy
 import datetime
 import enum
 import string
@@ -37,7 +38,10 @@ from neomodel import (
 )
 from pydantic import BaseModel, ConfigDict, Field
 
-from pydantic_neomodel_dict import Converter
+from pydantic_neomodel_dict.converters import SyncConverter
+from pydantic_neomodel_dict.core.registry import get_registry
+
+Converter = SyncConverter()
 
 # ----------------------------------------
 # Define a variety of test models
@@ -566,7 +570,8 @@ def preserve_hypothesis_model_registrations():
     print("Ensuring model registrations are preserved for hypothesis tests...")
 
     # Re-register if needed (they should already be registered from module level)
-    if SimplePydantic not in Converter._pydantic_to_ogm:
+    registry = get_registry()
+    if SimplePydantic not in registry._pydantic_to_ogm:
         print("Re-registering models for hypothesis tests...")
         # These are the same registrations that are at the module level
         Converter.register_models(SimplePydantic, SimpleOGM)
@@ -576,7 +581,7 @@ def preserve_hypothesis_model_registrations():
         Converter.register_models(PersonPydantic, PersonOGM)
 
         # Re-register custom type converters if needed
-        if (UserRole, str) not in Converter._type_converters:
+        if (UserRole, str) not in registry._type_converters:
             Converter.register_type_converter(
                 UserRole, str,
                 lambda role: role.value
@@ -600,7 +605,7 @@ def preserve_hypothesis_model_registrations():
 
             # Other converters as needed
 
-    print(f"Verified registrations: {len(Converter._pydantic_to_ogm)} model pairs")
+    print(f"Verified registrations: {len(registry._pydantic_to_ogm)} model pairs")
 
     # Override the clean_registry fixture to prevent it from cleaning during hypothesis tests
     orig_clean_registry = getattr(pytest, '_clean_registry', None)
@@ -1730,7 +1735,6 @@ class TestMixedConversions:
         original_person_dict = data.draw(person_dicts(with_nested=True, with_friends=True, max_depth=2))
 
         # Create a deep copy to prevent build_pydantic_models from modifying the original
-        import copy
         person_dict = copy.deepcopy(original_person_dict)
 
         # Path 1: Dict → OGM → Dict

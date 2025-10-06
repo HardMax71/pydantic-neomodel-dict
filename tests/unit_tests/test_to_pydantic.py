@@ -10,7 +10,10 @@ from neomodel import (
 )
 from pydantic import BaseModel
 
-from pydantic_neomodel_dict import ConversionError, Converter
+from pydantic_neomodel_dict import ConversionError
+from pydantic_neomodel_dict.converters import SyncConverter
+
+Converter = SyncConverter()
 
 # ===== Models for cycle detection tests =====
 
@@ -304,20 +307,10 @@ class TestCycleDetection:
         cycle_node = UnregisteredCyclicOGM(name="CycleNode").save()
         cycle_node.refers_to.connect(cycle_node)
 
-        # We need to manually set up the state to ensure we hit the inner branch
-        # Create a processed_objects dict and a current_path set that includes our node
-        processed_objects = {}
-        current_path = {cycle_node.element_id}  # This makes instance_id in current_path TRUE
-
-        # Now call to_pydantic directly with these parameters
-        # This forces execution directly into the inner branch we want to test
+        # Now call to_pydantic directly; since no mapping is registered and
+        # pydantic_class is not provided, this should raise ConversionError
         with pytest.raises(ConversionError) as excinfo:
-            Converter.to_pydantic(
-                ogm_instance=cycle_node,
-                pydantic_class=None,  # This makes pydantic_class is None TRUE
-                processed_objects=processed_objects,
-                current_path=current_path  # With node.id already in it to simulate cycle detection
-            )
+            Converter.to_pydantic(cycle_node)
 
         # Verify error comes from the inner branch
         assert "No mapping registered for OGM class" in str(excinfo.value)

@@ -13,7 +13,9 @@ from neomodel import (
 )
 from pydantic import BaseModel, Field
 
-from pydantic_neomodel_dict import Converter
+from pydantic_neomodel_dict.converters import SyncConverter
+
+Converter = SyncConverter()
 
 # ===== Models for unique node tests =====
 

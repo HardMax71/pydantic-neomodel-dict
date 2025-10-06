@@ -1,7 +1,9 @@
 import pytest
 from neomodel import BooleanProperty, FloatProperty, IntegerProperty, RelationshipTo, StringProperty, StructuredNode
 
-from pydantic_neomodel_dict import Converter
+from pydantic_neomodel_dict.converters import SyncConverter
+
+Converter = SyncConverter()
 
 # ===== Module-level model definitions =====
 

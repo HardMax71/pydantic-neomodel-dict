@@ -11,7 +11,10 @@ from neomodel import (
 )
 from pydantic import BaseModel, Field
 
-from pydantic_neomodel_dict import ConversionError, Converter
+from pydantic_neomodel_dict import ConversionError
+from pydantic_neomodel_dict.converters import SyncConverter
+
+Converter = SyncConverter()
 
 
 # Define an unregistered OGM model (won't have a Pydantic counterpart)

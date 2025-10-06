@@ -1,6 +1,8 @@
 import pytest
 
-from pydantic_neomodel_dict import Converter
+from pydantic_neomodel_dict.converters import SyncConverter
+
+Converter = SyncConverter()
 
 
 @pytest.fixture(autouse=True)
@@ -9,10 +11,7 @@ def clean_registry(request):
     # Only run this fixture for unit tests (path-based check)
     if "unit_tests" in request.path.parts:
         yield
-        # Clean up the registry
-        Converter._pydantic_to_ogm = {}
-        Converter._ogm_to_pydantic = {}
-        Converter._type_converters = {}
+        Converter.clear_registry()
     else:
         # For hypothesis tests or any other test type, do nothing
         yield

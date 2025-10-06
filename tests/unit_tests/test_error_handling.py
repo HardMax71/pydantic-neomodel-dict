@@ -1,7 +1,10 @@
 import pytest
 from pydantic import BaseModel
 
-from pydantic_neomodel_dict import ConversionError, Converter
+from pydantic_neomodel_dict import ConversionError
+from pydantic_neomodel_dict.converters import SyncConverter
+
+Converter = SyncConverter()
 
 # ===== Module-level model definitions =====
 

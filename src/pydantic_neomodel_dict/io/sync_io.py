@@ -1,14 +1,11 @@
-import logging
 from contextlib import contextmanager
 from typing import Any, Generator
 
 from neomodel import RelationshipManager, StructuredNode, db
 from neomodel.exceptions import CardinalityViolation
 
-from ._common import build_merge_query, get_relationship_type, should_use_reconnect
 from ..core.hooks import get_hooks
-
-logger = logging.getLogger(__name__)
+from ._common import build_merge_query, get_relationship_type, should_use_reconnect
 
 
 def save_node(node: StructuredNode) -> None:
@@ -45,11 +42,6 @@ def get_all_related(rel_manager: RelationshipManager) -> list[StructuredNode]:
         return list(rel_manager.all())
     except CardinalityViolation:
         return []
-
-
-def filter_nodes(ogm_class: type[StructuredNode], **filters: Any) -> list[StructuredNode]:
-    return list(ogm_class.nodes.filter(**filters))
-
 
 def merge_node_on_unique(
         ogm_class: type[StructuredNode],

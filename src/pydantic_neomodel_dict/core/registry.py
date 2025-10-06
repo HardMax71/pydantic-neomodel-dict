@@ -64,10 +64,10 @@ class ModelRegistry:
             return None
 
         with self._lock:
-            converter = self._type_converters.get((type(value), target_type))
+            converter = self._type_converters.get((type(value), target_type))  # type: ignore
 
         if converter:
-            return converter(value)
+            return converter(value)  # type: ignore
         return value
 
     def clear(self) -> None:

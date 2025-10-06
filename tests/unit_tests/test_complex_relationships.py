@@ -4,7 +4,9 @@ import pytest
 from neomodel import DateTimeProperty, RelationshipTo, StringProperty, StructuredNode, StructuredRel
 from pydantic import BaseModel, Field
 
-from pydantic_neomodel_dict import Converter
+from pydantic_neomodel_dict.converters import SyncConverter
+
+Converter = SyncConverter()
 
 # ===== Module-level model definitions =====
 

@@ -31,8 +31,7 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov hypothesis neomodel pydantic
-          pip install -e .
+          pip install -e .[dev]
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Run unit tests
         run: pytest -xvs tests/unit_tests/
@@ -69,8 +68,7 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov hypothesis neomodel pydantic
-          pip install -e .
+          pip install -e .[dev]
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Run hypothesis tests
         run: pytest -xvs tests/hypothesis_tests/
