@@ -312,8 +312,13 @@ class BaseConverter(ABC, Generic[NodeT, RelManagerT]):
         return None, data_id, properties, relationships, cache_key, defined_rels
 
     def _iter_pydantic_relationship_value(self, value: Any) -> List[Any]:
-        """Normalize a relationship value from Pydantic to a list of items."""
-        return value if (value.__class__ is list) else [value]
+        """Normalize a relationship value from Pydantic to a list of items.
+
+        Accepts list, tuple, set; otherwise wraps single item.
+        """
+        if isinstance(value, (list, tuple, set)):
+            return list(value)
+        return [value]
 
     def _enumerate_pydantic_relationships(
         self,
@@ -398,21 +403,20 @@ class BaseConverter(ABC, Generic[NodeT, RelManagerT]):
         return True, element_id, result
 
     def _normalize_relationship_input(self, rel_name: str, rel_data: Any) -> List[Dict[str, Any]]:
-        is_list = rel_data.__class__ is list
-        if is_list:
-            items = rel_data
+        if isinstance(rel_data, (list, tuple, set)):
+            items = list(rel_data)
         elif isinstance(rel_data, dict):
             items = [rel_data]
         else:
             raise ConversionError(
-                f"Relationship '{rel_name}' must be a dictionary or list of dictionaries, "
+                f"Relationship '{rel_name}' must be a dictionary or list/tuple/set of dictionaries, "
                 f"got {type(rel_data).__name__}"
             )
 
         for item in items:
             if not isinstance(item, dict):
                 raise ConversionError(
-                    f"Relationship '{rel_name}' must be a dictionary or list of dictionaries, "
+                    f"Relationship '{rel_name}' must be a dictionary or list/tuple/set of dictionaries, "
                     f"got list item of type {type(item).__name__}"
                 )
 

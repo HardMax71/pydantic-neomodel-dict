@@ -132,7 +132,10 @@ class SyncConverter(BaseConverter[StructuredNode, RelationshipManager]):
         filtered_props, unique_props = self._filter_defined_properties(ogm_class, properties)
 
         if unique_props:
-            return self._merge_node_on_unique(ogm_class, unique_props, filtered_props)
+            node = self._merge_node_on_unique(ogm_class, unique_props, filtered_props)
+            # Ensure hooks run and element_id is populated consistently
+            self._save_node(node)
+            return node
 
         node = ogm_class(**filtered_props)
         self._save_node(node)
