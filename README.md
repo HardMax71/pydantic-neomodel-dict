@@ -4,11 +4,9 @@
   <a href="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/ruff.yml">
     <img src="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/ruff.yml/badge.svg?branch=main" alt="Ruff">
   </a>
-  &nbsp;
   <a href="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/mypy.yml">
     <img src="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/mypy.yml/badge.svg?branch=main" alt="MyPy">
   </a>
-  &nbsp;
   <a href="https://sonarcloud.io/dashboard?id=HardMax71_pydantic-neomodel-dict">
     <img src="https://sonarcloud.io/api/project_badges/measure?project=HardMax71_pydantic-neomodel-dict&metric=alert_status" alt="Quality Gate Status">
   </a>
@@ -17,7 +15,6 @@
   <a href="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/tests.yml">
     <img src="https://github.com/HardMax71/pydantic-neomodel-dict/actions/workflows/tests.yml/badge.svg?branch=main" alt="Tests">
   </a>
-&nbsp;
   <a href="https://codecov.io/gh/HardMax71/pydantic-neomodel-dict">
     <img src="https://codecov.io/gh/HardMax71/pydantic-neomodel-dict/branch/main/graph/badge.svg" alt="Codecov">
   </a>
@@ -26,7 +23,6 @@
   <a href="https://badge.fury.io/py/pydantic-neomodel-dict">
     <img src="https://badge.fury.io/py/pydantic-neomodel-dict.svg" alt="PyPI version">
   </a>
-  &nbsp;
   <a href="https://pypi.org/project/pydantic-neomodel-dict/">
     <img src="https://img.shields.io/pypi/pyversions/pydantic-neomodel-dict.svg" alt="Python versions">
   </a>
@@ -53,7 +49,7 @@ pip install pydantic-neomodel-dict
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.10–3.12
 - pydantic 2.0.0+
 - neomodel 5.0.0+
 
@@ -69,7 +65,7 @@ Here's a simple example demonstrating conversion between Pydantic and Neomodel (
 ```python
 from pydantic import BaseModel
 from neomodel import StructuredNode, StringProperty, IntegerProperty, config
-from pydantic_neomodel_dict import Converter
+from pydantic_neomodel_dict.converters import SyncConverter
 
 # Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
@@ -91,6 +87,7 @@ class UserOGM(StructuredNode):
 
 
 # Register the model mapping
+Converter = SyncConverter()
 Converter.register_models(UserPydantic, UserOGM)
 
 # Convert Pydantic to OGM
@@ -128,7 +125,7 @@ This example demonstrates basic conversion between Pydantic models and Neomodel 
 ```python
 from pydantic import BaseModel
 from neomodel import StructuredNode, StringProperty, IntegerProperty, UniqueIdProperty, config
-from pydantic_neomodel_dict import Converter
+from pydantic_neomodel_dict.converters import SyncConverter
 
 # Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
@@ -153,6 +150,7 @@ class ProductOGM(StructuredNode):
 
 
 # Register the models
+Converter = SyncConverter()
 Converter.register_models(ProductPydantic, ProductOGM)
 
 # Create a Pydantic instance
@@ -198,7 +196,7 @@ from typing import List
 from neomodel import IntegerProperty, One, RelationshipFrom, RelationshipTo, StringProperty, StructuredNode, config
 from pydantic import BaseModel
 
-from pydantic_neomodel_dict import Converter
+from pydantic_neomodel_dict.converters import SyncConverter
 
 # Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
@@ -246,6 +244,7 @@ class CustomerOGM(StructuredNode):
 
 
 # Register model mappings
+Converter = SyncConverter()
 Converter.register_models(AddressPydantic, AddressOGM)
 Converter.register_models(OrderPydantic, OrderOGM)
 Converter.register_models(CustomerPydantic, CustomerOGM)
@@ -305,7 +304,7 @@ from neomodel import (
 )
 from pydantic import BaseModel
 
-from pydantic_neomodel_dict import Converter
+from pydantic_neomodel_dict.converters import SyncConverter
 
 # Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
@@ -330,6 +329,7 @@ class PersonOGM(StructuredNode):
 
 
 # Register models
+Converter = SyncConverter()
 Converter.register_models(PersonPydantic, PersonOGM)
 
 # Create instances with circular references
@@ -377,7 +377,7 @@ from neomodel import (
 )
 from pydantic import BaseModel
 
-from pydantic_neomodel_dict import Converter
+from pydantic_neomodel_dict.converters import SyncConverter
 
 # Set up Neomodel (Neo4j) connection - this is required!
 config.DATABASE_URL = 'bolt://neo4j:password@localhost:7687'
@@ -550,6 +550,7 @@ person_dict = {
 }
 
 # Convert dictionary to OGM model
+Converter = SyncConverter()
 person_ogm = Converter.dict_to_ogm(person_dict, PersonOGM)
 
 # Convert OGM model back to dictionary
@@ -574,25 +575,47 @@ Address: 456 Oak Avenue, San Francisco
 
 ## API Reference
 
-### Core Methods
+### Converters
 
-- `Converter.register_models(pydantic_class, ogm_class)`: Register mapping between Pydantic and OGM models
-- `Converter.to_ogm(pydantic_instance, ogm_class=None, max_depth=10)`: Convert Pydantic instance to OGM
-- `Converter.to_pydantic(ogm_instance, pydantic_class=None, max_depth=10)`: Convert OGM instance to Pydantic
-- `Converter.dict_to_ogm(data_dict, ogm_class, max_depth=10)`: Convert dictionary to OGM instance
-- `Converter.ogm_to_dict(ogm_instance, max_depth=10)`: Convert OGM instance to dictionary
+- Sync usage
+  ```python
+  from pydantic_neomodel_dict.converters import SyncConverter
+  conv = SyncConverter()
+  conv.register_models(PydanticModel, OGMModel)
+  node = conv.to_ogm(pydantic_instance)
+  model = conv.to_pydantic(node)
+  node2 = conv.dict_to_ogm(data_dict, OGMModel)
+  data2 = conv.ogm_to_dict(node)
+  ```
 
-### Batch Operations
+- Async usage
+  ```python
+  from pydantic_neomodel_dict.converters import AsyncConverter
+  conv = AsyncConverter()
+  node = await conv.to_ogm(pydantic_instance)
+  model = await conv.to_pydantic(node)
+  node2 = await conv.dict_to_ogm(data_dict, AsyncOGMModel)
+  data2 = await conv.ogm_to_dict(node)
+  ```
 
-- `Converter.batch_to_ogm(pydantic_instances, ogm_class=None, max_depth=10)`: Convert multiple Pydantic instances to OGM
-- `Converter.batch_to_pydantic(ogm_instances, pydantic_class=None, max_depth=10)`: Convert multiple OGM instances to
-  Pydantic
-- `Converter.batch_dict_to_ogm(data_dicts, ogm_class, max_depth=10)`: Convert multiple dictionaries to OGM instances
-- `Converter.batch_ogm_to_dict(ogm_instances, max_depth=10)`: Convert multiple OGM instances to dictionaries
+### Core Methods (sync signatures)
+
+- `register_models(pydantic_class, ogm_class)`
+- `to_ogm(pydantic_instance, ogm_class=None, max_depth=10)`
+- `to_pydantic(ogm_instance, pydantic_class=None, max_depth=10)`
+- `dict_to_ogm(data_dict, ogm_class, max_depth=10)`
+- `ogm_to_dict(ogm_instance, max_depth=10, include_properties=True, include_relationships=True)`
+
+### Batch Operations (sync signatures)
+
+- `batch_to_ogm(pydantic_instances, ogm_class=None, max_depth=10)`
+- `batch_to_pydantic(ogm_instances, pydantic_class=None, max_depth=10)`
+- `batch_dict_to_ogm(data_dicts, ogm_class, max_depth=10)`
+- `batch_ogm_to_dict(ogm_instances, max_depth=10)`
 
 ### Custom Type Conversion
 
-- `Converter.register_type_converter(source_type, target_type, converter_func)`: Register custom type converter function
+- `register_type_converter(source_type, target_type, converter_func)`
 
 ## Limitations
 
