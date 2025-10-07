@@ -315,6 +315,88 @@ class BaseConverter(ABC, Generic[NodeT, RelManagerT]):
         """Normalize a relationship value from Pydantic to a list of items."""
         return value if (value.__class__ is list) else [value]
 
+    def _enumerate_pydantic_relationships(
+        self,
+        pydantic_instance: BaseModel,
+        ogm_instance: NodeT,
+    ) -> List[Tuple[RelManagerT, type[NodeT], List[Any]]]:
+        """Prepare relationship sync tasks from a Pydantic instance into an OGM instance.
+
+        Returns a list of triples: (rel_manager, target_ogm_class, items)
+        where items is a normalized list of related Pydantic models to convert.
+        """
+        ogm_rels: Dict[str, Any] = type(ogm_instance).defined_properties(aliases=False, rels=True, properties=False)  # type: ignore[attr-defined]
+        pydantic_fields: Dict[str, Any] = type(pydantic_instance).model_fields
+
+        common_rels = self._common_relationship_names(ogm_rels, pydantic_fields)
+
+        tasks: List[Tuple[RelManagerT, type[NodeT], List[Any]]] = []
+        for rel_name in common_rels:
+            rel_value = getattr(pydantic_instance, rel_name)
+            if rel_value is None:
+                continue
+
+            rel_manager: RelManagerT = getattr(ogm_instance, rel_name)
+            rel_definition: Dict[str, Any] = ogm_rels[rel_name].definition
+            target_ogm_class: type[NodeT] = rel_definition['node_class']
+
+            items = self._iter_pydantic_relationship_value(rel_value)
+            tasks.append((rel_manager, target_ogm_class, items))
+
+        return tasks
+
+    def _enumerate_ogm_relationship_targets(
+        self,
+        ogm_instance: NodeT,
+        pydantic_class: type[BaseModel],
+    ) -> List[Tuple[str, RelManagerT, type[BaseModel]]]:
+        ogm_rels: Dict[str, Any] = ogm_instance.defined_properties(aliases=False, rels=True, properties=False)
+        pydantic_fields: Dict[str, Any] = pydantic_class.model_fields
+        registry = get_registry()
+
+        tasks: List[Tuple[str, RelManagerT, type[BaseModel]]] = []
+        for rel_name in self._common_relationship_names(ogm_rels, pydantic_fields):
+            rel = ogm_rels[rel_name]
+            target_ogm_class = rel.definition['node_class']
+            target_pydantic_class = registry.get_pydantic_class(target_ogm_class)
+            rel_manager: RelManagerT = getattr(ogm_instance, rel_name)
+            tasks.append((rel_name, rel_manager, target_pydantic_class))
+
+        return tasks
+
+    def _iter_ogm_relationship_managers(
+        self,
+        ogm_instance: NodeT,
+    ) -> List[Tuple[str, RelManagerT]]:
+        ogm_rels: Dict[str, Any] = ogm_instance.defined_properties(aliases=False, rels=True, properties=False)  # type: ignore[attr-defined]
+        return [
+            (rel_name, getattr(ogm_instance, rel_name))
+            for rel_name in ogm_rels.keys()
+        ]
+
+    def _prepare_ogm_to_dict(
+        self,
+        ogm_instance: NodeT,
+        processed: Dict[str, Dict[str, Any]],
+        path: Set[str],
+        max_depth: int,
+        include_properties: bool,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        element_id = ogm_instance.element_id
+        assert element_id is not None
+
+        stop, short = self._ogm_to_dict_prechecks(
+            element_id, ogm_instance, processed, path, max_depth, include_properties
+        )
+        if stop:
+            return False, element_id, short
+
+        result: Dict[str, Any] = (
+            self._extract_ogm_properties_as_dict(ogm_instance) if include_properties else {}
+        )
+        processed[element_id] = result
+        return True, element_id, result
+
     def _normalize_relationship_input(self, rel_name: str, rel_data: Any) -> List[Dict[str, Any]]:
         is_list = rel_data.__class__ is list
         if is_list:

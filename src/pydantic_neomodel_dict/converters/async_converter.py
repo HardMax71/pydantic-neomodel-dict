@@ -4,7 +4,6 @@ from neomodel.async_.core import AsyncStructuredNode
 from neomodel.async_.relationship_manager import AsyncRelationshipManager
 from pydantic import BaseModel
 
-from ..core.registry import get_registry
 from ..io import async_io
 from ..io._common import unwrap_relationship_value
 from ._base_converter import BaseConverter
@@ -154,31 +153,18 @@ class AsyncConverter(BaseConverter[AsyncStructuredNode, AsyncRelationshipManager
             max_depth: int
     ) -> None:
         """Synchronize relationships from Pydantic to OGM."""
-        ogm_class = type(ogm_instance)
-        pydantic_class = type(pydantic_instance)
-
-        ogm_rels = ogm_class.defined_properties(aliases=False, rels=True, properties=False)
-        pydantic_fields = pydantic_class.model_fields
-
-        common_rels = self._common_relationship_names(ogm_rels, pydantic_fields)
-
-        for rel_name in common_rels:
-            rel_value = getattr(pydantic_instance, rel_name)
-
-            if rel_value is None:
-                continue
-
-            rel_manager = getattr(ogm_instance, rel_name)
-            rel_definition = ogm_rels[rel_name].definition
-            target_ogm_class = rel_definition['node_class']
-
-            items = self._iter_pydantic_relationship_value(rel_value)
-
-            related_nodes: List[AsyncStructuredNode] = [
-                await self._to_ogm_recursive(item, target_ogm_class, processed, max_depth)
-                for item in items
-            ]
-
+        for rel_manager, target_ogm_class, items in self._enumerate_pydantic_relationships(
+            pydantic_instance, ogm_instance
+        ):
+            related_nodes: List[AsyncStructuredNode] = []
+            for item in items:
+                related_node = await self._to_ogm_recursive(
+                    item,
+                    target_ogm_class,
+                    processed,
+                    max_depth
+                )
+                related_nodes.append(related_node)
             await self._sync_relationship(rel_manager, related_nodes)
 
     async def _sync_relationship(
@@ -266,19 +252,11 @@ class AsyncConverter(BaseConverter[AsyncStructuredNode, AsyncRelationshipManager
         """Load relationships into Pydantic instance (no-op if max_depth <= 0)."""
         if max_depth <= 0:
             return
-        ogm_rels = ogm_instance.defined_properties(aliases=False, rels=True, properties=False)
         pydantic_fields = pydantic_class.model_fields
-        registry = get_registry()
-
-        common_rels = self._common_relationship_names(ogm_rels, pydantic_fields)
-        for rel_name in common_rels:
-            rel = ogm_rels[rel_name]
-            target_ogm_class = rel.definition['node_class']
-            target_pydantic_class = registry.get_pydantic_class(target_ogm_class)
-
-            rel_manager = getattr(ogm_instance, rel_name)
+        for rel_name, rel_manager, target_pydantic_class in self._enumerate_ogm_relationship_targets(
+            ogm_instance, pydantic_class
+        ):
             related_nodes = await self._get_all_related(rel_manager)
-
             converted = [
                 await self._to_pydantic_recursive(
                     node,
@@ -289,7 +267,6 @@ class AsyncConverter(BaseConverter[AsyncStructuredNode, AsyncRelationshipManager
                 )
                 for node in related_nodes
             ]
-
             field_type = pydantic_fields[rel_name].annotation
             self._assign_relationship_value(pydantic_instance, rel_name, field_type, converted)
 
@@ -371,31 +348,19 @@ class AsyncConverter(BaseConverter[AsyncStructuredNode, AsyncRelationshipManager
         if not ogm_instance.element_id:
             await self._save_node(ogm_instance)
 
-        element_id = ogm_instance.element_id
-        assert element_id is not None
-
-        stop, short = self._ogm_to_dict_prechecks(
-            element_id, ogm_instance, processed, path, max_depth, include_properties
+        ok, element_id, result = self._prepare_ogm_to_dict(
+            ogm_instance, processed, path, max_depth, include_properties
         )
-        if stop:
-            return short
-
-        result: Dict[str, Any] = (
-            self._extract_ogm_properties_as_dict(ogm_instance) if include_properties else {}
-        )
-
-        processed[element_id] = result
+        if not ok:
+            return result
 
         if not include_relationships:
             return result
 
         path.add(element_id)
         try:
-            ogm_rels = ogm_instance.defined_properties(aliases=False, rels=True, properties=False)
-            for rel_name, rel in ogm_rels.items():
-                rel_manager = getattr(ogm_instance, rel_name)
+            for rel_name, rel_manager in self._iter_ogm_relationship_managers(ogm_instance):
                 related_nodes = await self._get_all_related(rel_manager)
-
                 converted = [
                     await self._ogm_to_dict_recursive(
                         node,
@@ -407,10 +372,8 @@ class AsyncConverter(BaseConverter[AsyncStructuredNode, AsyncRelationshipManager
                     )
                     for node in related_nodes
                 ]
-
                 result[rel_name] = unwrap_relationship_value(rel_manager, rel_name, converted)
         finally:
             path.remove(element_id)
 
         return result
-    # Registry helpers are provided by BaseConverter
